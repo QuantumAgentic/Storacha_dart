@@ -9,6 +9,7 @@ export 'src/client/space.dart';
 export 'src/client/storacha_client.dart';
 
 // Export core utilities
+export 'src/core/encoding.dart';
 export 'src/core/network_retry.dart';
 
 // Export cryptography utilities
