@@ -32,8 +32,13 @@ export 'src/ipfs/unixfs/protobuf_encoder.dart';
 export 'src/ipfs/unixfs/unixfs_encoder.dart';
 export 'src/ipfs/unixfs/unixfs_types.dart';
 
+// Export network transport
+export 'src/transport/storacha_transport.dart';
+
 // Export UCAN utilities
 export 'src/ucan/capability.dart';
+export 'src/ucan/capability_types.dart';
+export 'src/ucan/invocation.dart';
 export 'src/ucan/ucan.dart';
 
 // Export upload utilities
