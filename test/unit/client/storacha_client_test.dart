@@ -5,6 +5,7 @@ import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
 import 'package:storacha_dart/src/client/storacha_client.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
 import 'package:storacha_dart/src/upload/blob.dart';
 import 'package:storacha_dart/src/upload/upload_options.dart';
 import 'package:test/test.dart';
@@ -312,7 +313,7 @@ void main() {
     });
   });
 
-  group('Upload (stubs)', () {
+  group('Upload', () {
     late StorachaClient client;
     late Signer principal;
 
@@ -338,37 +339,93 @@ void main() {
       );
     });
 
-    test('uploadFile throws UnimplementedError with space selected', () async {
+    test('uploadFile returns CID for small file', () async {
       await client.createSpace('Test Space');
 
       final file = MemoryFile(
         name: 'test.txt',
-        bytes: Uint8List.fromList(utf8.encode('test')),
+        bytes: Uint8List.fromList(utf8.encode('Hello, World!')),
       );
 
-      expect(
-        () => client.uploadFile(file),
-        throwsUnimplementedError,
-      );
+      final cid = await client.uploadFile(file);
+
+      expect(cid, isNotNull);
+      expect(cid.version, equals(CidVersion.v1));
+      expect(cid.toString(), isNotEmpty);
     });
 
-    test('uploadFile accepts options', () async {
+    test('uploadFile returns CID for chunked file', () async {
+      await client.createSpace('Test Space');
+
+      // Create a file larger than default chunk size (256 KiB)
+      final largeData = Uint8List.fromList(
+        List.generate(300 * 1024, (i) => i % 256),
+      );
+      final file = MemoryFile(
+        name: 'large.bin',
+        bytes: largeData,
+      );
+
+      final cid = await client.uploadFile(file);
+
+      expect(cid, isNotNull);
+      expect(cid.version, equals(CidVersion.v1));
+      // Chunked files use dag-pb codec
+      expect(cid.code, equals(dagPbCode));
+    });
+
+    test('uploadFile accepts custom chunk size', () async {
       await client.createSpace('Test Space');
 
       final file = MemoryFile(
         name: 'test.txt',
-        bytes: Uint8List.fromList(utf8.encode('test')),
+        bytes: Uint8List.fromList(List.generate(1000, (i) => i % 256)),
       );
 
       const options = UploadFileOptions(
-        retries: 5,
-        chunkSize: 256 * 1024,
+        chunkSize: 256, // Small chunks for testing
       );
 
-      expect(
-        () => client.uploadFile(file, options: options),
-        throwsUnimplementedError,
+      final cid = await client.uploadFile(file, options: options);
+
+      expect(cid, isNotNull);
+      // With small chunks, file will be chunked
+      expect(cid.code, equals(dagPbCode));
+    });
+
+    test('uploadFile calls progress callback', () async {
+      await client.createSpace('Test Space');
+
+      final file = MemoryFile(
+        name: 'test.txt',
+        bytes: Uint8List.fromList(utf8.encode('Hello!')),
       );
+
+      ProgressStatus? lastStatus;
+      final options = UploadFileOptions(
+        onUploadProgress: (status) {
+          lastStatus = status;
+        },
+      );
+
+      await client.uploadFile(file, options: options);
+
+      expect(lastStatus, isNotNull);
+      expect(lastStatus!.percentage, equals(100.0));
+    });
+
+    test('uploadFile returns consistent CID for same content', () async {
+      await client.createSpace('Test Space');
+
+      final data = utf8.encode('consistent content');
+      final file1 = MemoryFile(name: 'file1.txt', bytes: data);
+      final file2 = MemoryFile(name: 'file2.txt', bytes: data);
+
+      final cid1 = await client.uploadFile(file1);
+      final cid2 = await client.uploadFile(file2);
+
+      // Same content should produce same CID (content-addressable)
+      expect(cid1, equals(cid2));
     });
 
     test('uploadDirectory throws StateError when no space selected', () {

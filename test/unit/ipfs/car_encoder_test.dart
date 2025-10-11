@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:storacha_dart/src/ipfs/car/car_encoder.dart';
+import 'package:storacha_dart/src/ipfs/car/car_encoder.dart'
+    show calculateCarSize, encodeCar;
 import 'package:storacha_dart/src/ipfs/car/car_types.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/multihash.dart';
@@ -55,7 +56,7 @@ void main() {
       final cid = CID.createV1(rawCode, sha256Hash(data));
 
       final block = CARBlock(cid: cid, bytes: data);
-      final carBytes = CAREncoder.encode(roots: [cid], blocks: [block]);
+      final carBytes = encodeCar(roots: [cid], blocks: [block]);
 
       // CAR should have content
       expect(carBytes, isNotEmpty);
@@ -79,7 +80,7 @@ void main() {
         CARBlock(cid: cid3, bytes: data3),
       ];
 
-      final carBytes = CAREncoder.encode(roots: [cid3], blocks: blocks);
+      final carBytes = encodeCar(roots: [cid3], blocks: blocks);
 
       expect(carBytes, isNotEmpty);
     });
@@ -96,7 +97,7 @@ void main() {
         CARBlock(cid: cid2, bytes: data2),
       ];
 
-      final carBytes = CAREncoder.encode(
+      final carBytes = encodeCar(
         roots: [cid1, cid2],
         blocks: blocks,
       );
@@ -109,7 +110,7 @@ void main() {
       final cid = CID.createV1(rawCode, sha256Hash(data));
 
       final block = CARBlock(cid: cid, bytes: data);
-      final carBytes = CAREncoder.encode(roots: [cid], blocks: [block]);
+      final carBytes = encodeCar(roots: [cid], blocks: [block]);
 
       expect(carBytes, isNotEmpty);
     });
@@ -120,7 +121,7 @@ void main() {
       final cid = CID.createV1(rawCode, sha256Hash(data));
 
       final block = CARBlock(cid: cid, bytes: data);
-      final carBytes = CAREncoder.encode(roots: [cid], blocks: [block]);
+      final carBytes = encodeCar(roots: [cid], blocks: [block]);
 
       expect(carBytes, isNotEmpty);
       // Should be roughly data size + header + CID + varint overhead
@@ -139,12 +140,12 @@ void main() {
         CARBlock(cid: cid2, bytes: data2),
       ];
 
-      final calculatedSize = CAREncoder.calculateSize(
+      final calculatedSize = calculateCarSize(
         roots: [cid2],
         blocks: blocks,
       );
 
-      final carBytes = CAREncoder.encode(
+      final carBytes = encodeCar(
         roots: [cid2],
         blocks: blocks,
       );
@@ -164,12 +165,12 @@ void main() {
           if (i == count - 1) roots.add(cid);
         }
 
-        final calculatedSize = CAREncoder.calculateSize(
+        final calculatedSize = calculateCarSize(
           roots: roots,
           blocks: blocks,
         );
 
-        final carBytes = CAREncoder.encode(
+        final carBytes = encodeCar(
           roots: roots,
           blocks: blocks,
         );
@@ -187,8 +188,8 @@ void main() {
       final cid = CID.createV1(rawCode, sha256Hash(data));
       final block = CARBlock(cid: cid, bytes: data);
 
-      final car1 = CAREncoder.encode(roots: [cid], blocks: [block]);
-      final car2 = CAREncoder.encode(roots: [cid], blocks: [block]);
+      final car1 = encodeCar(roots: [cid], blocks: [block]);
+      final car2 = encodeCar(roots: [cid], blocks: [block]);
 
       expect(car1, equals(car2));
     });
@@ -200,12 +201,12 @@ void main() {
       final cid1 = CID.createV1(rawCode, sha256Hash(data1));
       final cid2 = CID.createV1(rawCode, sha256Hash(data2));
 
-      final car1 = CAREncoder.encode(
+      final car1 = encodeCar(
         roots: [cid1],
         blocks: [CARBlock(cid: cid1, bytes: data1)],
       );
 
-      final car2 = CAREncoder.encode(
+      final car2 = encodeCar(
         roots: [cid2],
         blocks: [CARBlock(cid: cid2, bytes: data2)],
       );
@@ -221,7 +222,7 @@ void main() {
       final cid = CID.createV1(rawCode, sha256Hash(fileData));
 
       final block = CARBlock(cid: cid, bytes: fileData);
-      final carBytes = CAREncoder.encode(roots: [cid], blocks: [block]);
+      final carBytes = encodeCar(roots: [cid], blocks: [block]);
 
       expect(carBytes, isNotEmpty);
       expect(carBytes.length, greaterThan(fileData.length));
@@ -243,7 +244,7 @@ void main() {
         CARBlock(cid: rootCID, bytes: rootData),
       ];
 
-      final carBytes = CAREncoder.encode(roots: [rootCID], blocks: blocks);
+      final carBytes = encodeCar(roots: [rootCID], blocks: blocks);
 
       expect(carBytes, isNotEmpty);
     });
@@ -263,12 +264,12 @@ void main() {
       final rootCID = CID.createV1(dagPbCode, sha256Hash(rootData));
       blocks.add(CARBlock(cid: rootCID, bytes: rootData));
 
-      final size = CAREncoder.calculateSize(
+      final size = calculateCarSize(
         roots: [rootCID],
         blocks: blocks,
       );
 
-      final encoded = CAREncoder.encode(
+      final encoded = encodeCar(
         roots: [rootCID],
         blocks: blocks,
       );

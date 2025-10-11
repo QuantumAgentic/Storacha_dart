@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import '../multiformats/cid.dart';
-import '../multiformats/varint.dart' as varint;
-import 'car_types.dart';
+import 'package:storacha_dart/src/ipfs/car/car_types.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/varint.dart' as varint;
 
 /// Encodes IPLD blocks into a CAR (Content Addressable aRchive) file.
 ///
@@ -15,54 +15,45 @@ import 'car_types.dart';
 /// ```
 /// [Block length (varint)] [CID bytes] [Block data]
 /// ```
-class CAREncoder {
-  /// Encodes a list of blocks into a CAR file.
-  ///
-  /// The [roots] parameter specifies the root CIDs.
-  /// The [blocks] parameter contains all blocks to include.
-  ///
-  /// Returns the complete CAR file as bytes.
-  static Uint8List encode({
-    required List<CID> roots,
-    required List<CARBlock> blocks,
-  }) {
-    final builder = BytesBuilder();
+///
+/// The [roots] parameter specifies the root CIDs.
+/// The [blocks] parameter contains all blocks to include.
+///
+/// Returns the complete CAR file as bytes.
+Uint8List encodeCar({
+  required List<CID> roots,
+  required List<CARBlock> blocks,
+}) {
+  final builder = BytesBuilder();
 
-    // Encode header
-    final header = CARHeader(version: CARVersion.v1, roots: roots);
-    final headerBytes = _encodeHeader(header);
-    final headerLength = varint.encode(headerBytes.length);
+  // Encode header
+  final header = CARHeader(version: CARVersion.v1, roots: roots);
+  final headerBytes = _encodeCarHeader(header);
+  final headerLength = varint.encode(headerBytes.length);
 
-    builder.add(headerLength);
-    builder.add(headerBytes);
+  builder
+    ..add(headerLength)
+    ..add(headerBytes);
 
-    // Encode blocks
-    for (final block in blocks) {
-      final blockBytes = _encodeBlock(block);
-      builder.add(blockBytes);
-    }
-
-    return builder.toBytes();
+  // Encode blocks
+  for (final block in blocks) {
+    final blockBytes = _encodeCarBlock(block);
+    builder.add(blockBytes);
   }
 
-  /// Encodes a CAR header to CBOR format.
-  static Uint8List _encodeHeader(CARHeader header) {
+  return builder.toBytes();
+}
+
+/// Encodes a CAR header to CBOR format.
+Uint8List _encodeCarHeader(CARHeader header) {
     // CBOR encoding for { version: 1, roots: [CID, ...] }
-    final builder = BytesBuilder();
-
-    // Map with 2 keys
-    builder.addByte(0xA2); // CBOR major type 5 (map), additional info 2
-
-    // Key: "version" (7 bytes)
-    builder.addByte(0x67); // CBOR text string, length 7
-    builder.add('version'.codeUnits);
-
-    // Value: 1 (positive integer)
-    builder.addByte(0x01); // CBOR major type 0, value 1
-
-    // Key: "roots" (5 bytes)
-    builder.addByte(0x65); // CBOR text string, length 5
-    builder.add('roots'.codeUnits);
+    final builder = BytesBuilder()
+      ..addByte(0xA2) // CBOR major type 5 (map), additional info 2
+      ..addByte(0x67) // CBOR text string, length 7
+      ..add('version'.codeUnits)
+      ..addByte(0x01) // CBOR major type 0, value 1
+      ..addByte(0x65) // CBOR text string, length 5
+      ..add('roots'.codeUnits);
 
     // Value: array of CIDs
     final rootCount = header.roots.length;
@@ -99,42 +90,40 @@ class CAREncoder {
     return builder.toBytes();
   }
 
-  /// Encodes a single CAR block.
-  static Uint8List _encodeBlock(CARBlock block) {
-    final cidBytes = block.cid.bytes;
-    final dataBytes = block.bytes;
+/// Encodes a single CAR block.
+Uint8List _encodeCarBlock(CARBlock block) {
+  final cidBytes = block.cid.bytes;
+  final dataBytes = block.bytes;
 
-    // Block = CID bytes + data bytes
-    final blockLength = cidBytes.length + dataBytes.length;
-    final lengthVarint = varint.encode(blockLength);
+  // Block = CID bytes + data bytes
+  final blockLength = cidBytes.length + dataBytes.length;
+  final lengthVarint = varint.encode(blockLength);
 
-    final builder = BytesBuilder();
-    builder.add(lengthVarint);
-    builder.add(cidBytes);
-    builder.add(dataBytes);
+  return (BytesBuilder()
+        ..add(lengthVarint)
+        ..add(cidBytes)
+        ..add(dataBytes))
+      .toBytes();
+}
 
-    return builder.toBytes();
+/// Calculates the size of a CAR file without encoding it.
+int calculateCarSize({
+  required List<CID> roots,
+  required List<CARBlock> blocks,
+}) {
+  // Header
+  final header = CARHeader(version: CARVersion.v1, roots: roots);
+  final headerBytes = _encodeCarHeader(header);
+  final headerLengthSize = varint.encodingLength(headerBytes.length);
+
+  var totalSize = headerLengthSize + headerBytes.length;
+
+  // Blocks
+  for (final block in blocks) {
+    final blockSize = block.cid.bytes.length + block.bytes.length;
+    totalSize += varint.encodingLength(blockSize) + blockSize;
   }
 
-  /// Calculates the size of a CAR file without encoding it.
-  static int calculateSize({
-    required List<CID> roots,
-    required List<CARBlock> blocks,
-  }) {
-    // Header
-    final header = CARHeader(version: CARVersion.v1, roots: roots);
-    final headerBytes = _encodeHeader(header);
-    final headerLengthSize = varint.encodingLength(headerBytes.length);
-
-    var totalSize = headerLengthSize + headerBytes.length;
-
-    // Blocks
-    for (final block in blocks) {
-      final blockSize = block.cid.bytes.length + block.bytes.length;
-      totalSize += varint.encodingLength(blockSize) + blockSize;
-    }
-
-    return totalSize;
-  }
+  return totalSize;
 }
 
