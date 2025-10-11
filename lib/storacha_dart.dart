@@ -40,6 +40,7 @@ export 'src/transport/storacha_transport.dart';
 export 'src/ucan/capability.dart';
 export 'src/ucan/capability_types.dart';
 export 'src/ucan/invocation.dart';
+export 'src/ucan/invocation_encoder.dart';
 export 'src/ucan/ucan.dart';
 
 // Export upload utilities

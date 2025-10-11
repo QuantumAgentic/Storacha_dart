@@ -1,20 +1,42 @@
 /// HTTP transport for Storacha network communication
 library;
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:storacha_dart/src/core/network_retry.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
 import 'package:storacha_dart/src/ucan/capability_types.dart';
 import 'package:storacha_dart/src/ucan/invocation.dart';
+import 'package:storacha_dart/src/ucan/invocation_encoder.dart';
+
+/// Exception thrown when Storacha service returns an error
+class StorachaException implements Exception {
+  StorachaException(this.message, {this.code, this.details});
+
+  final String message;
+  final String? code;
+  final Map<String, dynamic>? details;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('StorachaException: $message');
+    if (code != null) buffer.write(' (code: $code)');
+    if (details != null) buffer.write('\nDetails: $details');
+    return buffer.toString();
+  }
+}
 
 /// Transport for communicating with Storacha services
 class StorachaTransport {
   StorachaTransport({
     String? endpoint,
     Dio? dio,
+    RetryConfig? retryConfig,
   })  : endpoint = endpoint ?? 'https://up.storacha.network',
-        _dio = dio ?? Dio();
+        _dio = dio ?? Dio(),
+        retryConfig = retryConfig ?? RetryPresets.standard;
 
   /// Storacha service endpoint
   final String endpoint;
@@ -22,25 +44,71 @@ class StorachaTransport {
   /// HTTP client
   final Dio _dio;
 
+  /// Retry configuration for network requests
+  final RetryConfig retryConfig;
+
+  /// Invoke a UCAN capability on the Storacha service
+  ///
+  /// Encodes the invocation as a CAR file and POSTs it to the endpoint.
+  /// Returns the response body as a Map.
+  Future<Map<String, dynamic>> invokeCapability({
+    required InvocationBuilder builder,
+    int? expiration,
+    String? nonce,
+  }) async {
+    // Step 1: Sign the invocation to get JWT
+    final jwt = await builder.sign(expiration: expiration, nonce: nonce);
+
+    // Step 2: Encode JWT to CAR format
+    final carBytes = encodeInvocationToCar(jwt);
+
+    // Step 3: POST to Storacha with retry
+    final retry = ExponentialBackoffRetry(config: retryConfig);
+
+    final response = await retry.execute<Response<dynamic>>(
+      () async {
+        return _dio.post<dynamic>(
+          endpoint,
+          data: carBytes,
+          options: Options(
+            contentType: 'application/vnd.ipld.car',
+            responseType: ResponseType.json,
+            headers: {
+              'Accept': 'application/json',
+            },
+          ),
+        );
+      },
+    );
+
+    // Step 4: Parse response
+    return _parseResponse(response);
+  }
+
   /// Invoke space/blob/add capability
   ///
   /// Returns allocation information for uploading the blob.
   Future<BlobAllocation> invokeBlobAdd({
     required String spaceDid,
     required BlobDescriptor blob,
-    required UcanInvocation invocation,
+    required InvocationBuilder builder,
   }) async {
-    // TODO(network): Implement UCAN invocation transport
-    // Steps:
-    // 1. Encode invocation to CAR
-    // 2. POST to endpoint
-    // 3. Parse response
-    // 4. Return BlobAllocation
+    final response = await invokeCapability(builder: builder);
 
-    throw UnimplementedError(
-      'space/blob/add invocation not yet implemented. '
-      'Requires CAR encoding for UCAN and HTTP POST.',
-    );
+    // Parse the response
+    if (response.containsKey('error')) {
+      throw _parseError(response);
+    }
+
+    final ok = response['ok'] as Map<String, dynamic>?;
+    if (ok == null) {
+      throw StorachaException(
+        'Invalid response: missing "ok" field',
+        details: response,
+      );
+    }
+
+    return BlobAllocation.fromJson(ok);
   }
 
   /// Upload blob to allocated URL
@@ -52,12 +120,20 @@ class StorachaTransport {
     required Map<String, String> headers,
     void Function(int sent, int total)? onProgress,
   }) async {
-    // TODO(network): Implement blob upload
-    // Use Dio to PUT data to URL with headers
+    final retry = ExponentialBackoffRetry(config: retryConfig);
 
-    throw UnimplementedError(
-      'Blob upload not yet implemented. '
-      'Requires HTTP PUT with progress tracking.',
+    await retry.execute<Response<dynamic>>(
+      () async {
+        return _dio.put<dynamic>(
+          url,
+          data: Stream.fromIterable([data]),
+          options: Options(
+            contentType: 'application/vnd.ipld.car',
+            headers: headers,
+          ),
+          onSendProgress: onProgress,
+        );
+      },
     );
   }
 
@@ -68,14 +144,69 @@ class StorachaTransport {
     required String spaceDid,
     required CID root,
     required List<CID> shards,
-    required UcanInvocation invocation,
+    required InvocationBuilder builder,
   }) async {
-    // TODO(network): Implement UCAN invocation transport
-    // Similar to invokeBlobAdd but for upload/add
+    final response = await invokeCapability(builder: builder);
 
-    throw UnimplementedError(
-      'upload/add invocation not yet implemented. '
-      'Requires CAR encoding for UCAN and HTTP POST.',
+    // Parse the response
+    if (response.containsKey('error')) {
+      throw _parseError(response);
+    }
+
+    final ok = response['ok'] as Map<String, dynamic>?;
+    if (ok == null) {
+      throw StorachaException(
+        'Invalid response: missing "ok" field',
+        details: response,
+      );
+    }
+
+    return UploadResult.fromJson(ok);
+  }
+
+  /// Parse HTTP response
+  Map<String, dynamic> _parseResponse(Response<dynamic> response) {
+    if (response.statusCode != 200) {
+      throw StorachaException(
+        'HTTP ${response.statusCode}: ${response.statusMessage}',
+        code: response.statusCode.toString(),
+      );
+    }
+
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return data;
+    } else if (data is String) {
+      try {
+        return json.decode(data) as Map<String, dynamic>;
+      } catch (e) {
+        throw StorachaException(
+          'Failed to parse JSON response: $e',
+          details: {'raw': data},
+        );
+      }
+    } else {
+      throw StorachaException(
+        'Unexpected response type: ${data.runtimeType}',
+        details: {'data': data},
+      );
+    }
+  }
+
+  /// Parse error from response
+  StorachaException _parseError(Map<String, dynamic> response) {
+    final error = response['error'] as Map<String, dynamic>?;
+    if (error == null) {
+      return StorachaException(
+        'Unknown error',
+        details: response,
+      );
+    }
+
+    return StorachaException(
+      error['message']?.toString() ?? 'Unknown error',
+      code: error['name']?.toString(),
+      details: error,
     );
   }
 
@@ -84,4 +215,3 @@ class StorachaTransport {
     _dio.close();
   }
 }
-
