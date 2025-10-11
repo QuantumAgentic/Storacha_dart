@@ -1,5 +1,6 @@
 // ignore_for_file: sort_constructors_first
 
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -160,4 +161,139 @@ class MemoryFile implements FileLike {
 
   @override
   String toString() => 'MemoryFile(name: $name, size: $size bytes)';
+}
+
+/// A file-based implementation of [BlobLike] that streams from disk.
+///
+/// This is the **recommended** implementation for large files on mobile
+/// devices, as it reads the file in chunks without loading everything into
+/// memory.
+///
+/// **Memory efficient**:
+/// - Only loads chunks (default 256 KiB) into memory at a time
+/// - Suitable for multi-GB files on iOS/Android
+/// - No OutOfMemory errors even on low-end devices
+///
+/// Example:
+/// ```dart
+/// final file = File('/path/to/large_video.mp4');
+/// final blob = FileBlob(file);
+///
+/// // Streams efficiently - only ~256 KiB in memory at any time
+/// await client.uploadFile(blob);
+/// ```
+@immutable
+class FileBlob implements BlobLike {
+  /// Creates a file-based blob.
+  const FileBlob(
+    this.file, {
+    this.chunkSize = 256 * 1024, // 256 KiB default
+  });
+
+  /// The file to stream from disk.
+  final File file;
+
+  /// Size of chunks to read from disk (default 256 KiB).
+  ///
+  /// Smaller chunks use less memory but may be slower.
+  /// Larger chunks are faster but use more memory.
+  final int chunkSize;
+
+  @override
+  Stream<Uint8List> stream() async* {
+    final stream = file.openRead();
+    final chunks = <int>[];
+
+    await for (final chunk in stream) {
+      chunks.addAll(chunk);
+
+      // Yield when we have enough data
+      while (chunks.length >= chunkSize) {
+        yield Uint8List.fromList(chunks.sublist(0, chunkSize));
+        chunks.removeRange(0, chunkSize);
+      }
+    }
+
+    // Yield remaining data
+    if (chunks.isNotEmpty) {
+      yield Uint8List.fromList(chunks);
+    }
+  }
+
+  @override
+  int get size => file.lengthSync();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FileBlob &&
+          file.path == other.file.path &&
+          chunkSize == other.chunkSize;
+
+  @override
+  int get hashCode => Object.hash(file.path, chunkSize);
+
+  @override
+  String toString() => 'FileBlob(path: ${file.path}, size: $size bytes, '
+      'chunkSize: $chunkSize)';
+}
+
+/// A file-based implementation of [FileLike] that streams from disk.
+///
+/// This combines [FileBlob]'s efficient streaming with a filename,
+/// making it suitable for file uploads where the name is important.
+///
+/// Example:
+/// ```dart
+/// final file = File('/storage/photos/vacation.jpg');
+/// final fileLike = FileLikeFromFile(
+///   file,
+///   name: 'vacation.jpg', // Or preserve path: 'photos/vacation.jpg'
+/// );
+///
+/// await client.uploadFile(fileLike);
+/// ```
+@immutable
+class FileLikeFromFile implements FileLike {
+  /// Creates a file-like from a file.
+  const FileLikeFromFile(
+    this.file, {
+    required this.name,
+    this.chunkSize = 256 * 1024,
+  });
+
+  /// The underlying file.
+  final File file;
+
+  @override
+  final String name;
+
+  /// Size of chunks to read from disk.
+  final int chunkSize;
+
+  @override
+  Stream<Uint8List> stream() async* {
+    final blob = FileBlob(file, chunkSize: chunkSize);
+    await for (final chunk in blob.stream()) {
+      yield chunk;
+    }
+  }
+
+  @override
+  int get size => file.lengthSync();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FileLikeFromFile &&
+          file.path == other.file.path &&
+          name == other.name &&
+          chunkSize == other.chunkSize;
+
+  @override
+  int get hashCode => Object.hash(file.path, name, chunkSize);
+
+  @override
+  String toString() =>
+      'FileLikeFromFile(path: ${file.path}, name: $name, size: $size bytes)';
 }
