@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
-import 'package:storacha_dart/src/ipfs/multiformats/multibase.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_encoder.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_types.dart';
 import 'package:storacha_dart/src/upload/blob.dart';

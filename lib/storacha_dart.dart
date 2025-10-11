@@ -22,6 +22,12 @@ export 'src/ipfs/multiformats/multibase.dart';
 export 'src/ipfs/multiformats/multihash.dart';
 export 'src/ipfs/multiformats/varint.dart';
 
+// Export IPFS UnixFS utilities
+export 'src/ipfs/unixfs/file_chunker.dart';
+export 'src/ipfs/unixfs/protobuf_encoder.dart';
+export 'src/ipfs/unixfs/unixfs_encoder.dart';
+export 'src/ipfs/unixfs/unixfs_types.dart';
+
 // Export UCAN utilities
 export 'src/ucan/capability.dart';
 export 'src/ucan/ucan.dart';
