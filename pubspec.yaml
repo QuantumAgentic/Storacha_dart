@@ -46,6 +46,9 @@ dependencies:
   
   # Cross-platform file handling
   cross_file: ^0.3.4+1
+  
+  # Meta annotations (@immutable, etc.)
+  meta: ^1.11.0
 
 dev_dependencies:
   flutter_test:
