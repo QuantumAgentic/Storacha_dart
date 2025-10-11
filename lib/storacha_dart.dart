@@ -16,6 +16,10 @@ export 'src/crypto/did.dart';
 export 'src/crypto/ed25519_key_pair.dart';
 export 'src/crypto/signer.dart';
 
+// Export IPFS CAR utilities
+export 'src/ipfs/car/car_encoder.dart';
+export 'src/ipfs/car/car_types.dart';
+
 // Export IPFS multiformats utilities (internal for now, will be hidden later)
 export 'src/ipfs/multiformats/cid.dart';
 export 'src/ipfs/multiformats/multibase.dart';
