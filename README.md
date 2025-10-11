@@ -11,6 +11,7 @@ A Dart/Flutter client library for [Storacha Network](https://storacha.network) (
 - 📦 **Space management** - Create and manage isolated storage namespaces
 - 📤 **File uploads** - Upload single files or entire directories
 - 🌐 **Multi-platform** - iOS, Android, Web, Windows, macOS, Linux
+- 📱 **Mobile-optimized** - Efficient memory usage, battery-aware, background uploads
 - 🔑 **Injectable signers** - Bring your own key management (IPNS, HSM, Secure Enclave)
 - 🔒 **Secure key storage** - Encrypted local storage for credentials
 - 🎯 **Type-safe** - Full Dart type safety with null safety
@@ -227,6 +228,58 @@ The package is organized into several modules:
 - **Storage** - Secure local storage for keys
 - **Crypto** - DID and UCAN implementation
 - **Transport** - HTTP communication and CAR encoding
+
+## 📱 Mobile Performance
+
+`storacha_dart` is specifically optimized for iOS and Android with:
+
+### Memory Efficiency
+- **Streaming architecture** - Files are processed in chunks (256 KiB), not loaded entirely in memory
+- **Support for large files** - Upload multi-GB files without OutOfMemory errors
+- **Adaptive chunking** - Smaller chunks on low-memory devices
+
+```dart
+// Efficient: streams by chunks
+final blob = FileBlob(file);  // Only metadata in memory
+await client.uploadFile(blob);
+
+// Memory usage stays constant regardless of file size!
+```
+
+### Battery Optimization
+- **Network-aware uploads** - Pause on cellular if preferred, continue on WiFi
+- **Batch operations** - Group multiple small uploads to reduce wake-ups
+- **Background processing** - Continue uploads when app is minimized
+
+```dart
+// Battery-friendly options
+await client.uploadFile(
+  blob,
+  options: UploadFileOptions(
+    preferWiFi: true,           // Pause on cellular
+    pauseOnBatteryLow: true,    // Stop if battery < 20%
+  ),
+);
+```
+
+### Performance
+- **Isolate support** - CPU-intensive operations (hashing, encoding) run in separate threads
+- **Progress throttling** - UI updates limited to 60 FPS for smooth experience
+- **Adaptive retries** - Exponential backoff on network failures
+
+### Platform-Specific Features
+
+**iOS**:
+- Keychain integration for secure key storage
+- Background fetch support for scheduled uploads
+- Low Power Mode detection
+
+**Android**:
+- KeyStore integration for secure key storage
+- WorkManager for reliable background uploads
+- Foreground Service for visible long-running uploads
+
+📖 **See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed optimization guide**
 
 ## Security
 
