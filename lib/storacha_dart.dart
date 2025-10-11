@@ -8,6 +8,9 @@ export 'src/client/client_config.dart';
 export 'src/client/space.dart';
 export 'src/client/storacha_client.dart';
 
+// Export core utilities
+export 'src/core/network_retry.dart';
+
 // Export cryptography utilities
 export 'src/crypto/did.dart';
 export 'src/crypto/ed25519_key_pair.dart';
