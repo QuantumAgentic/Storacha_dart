@@ -1,0 +1,73 @@
+name: storacha_dart
+description: A Dart client library for Storacha Network (IPFS/Filecoin storage). Upload files, manage spaces, and interact with decentralized storage.
+version: 0.1.0
+homepage: https://github.com/CasterCorp/storacha_dart
+repository: https://github.com/CasterCorp/storacha_dart
+issue_tracker: https://github.com/CasterCorp/storacha_dart/issues
+documentation: https://pub.dev/documentation/storacha_dart/latest/
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # HTTP client with interceptors and advanced features
+  dio: ^5.4.0
+  
+  # Cryptographic functions
+  crypto: ^3.0.3
+  
+  # Base64, hex, and other encodings
+  convert: ^3.1.1
+  
+  # Secure storage for keys (Keychain/KeyStore)
+  flutter_secure_storage: ^9.0.0
+  
+  # File path manipulation
+  path: ^1.9.0
+  
+  # MIME type detection
+  mime: ^1.0.5
+  
+  # UUID generation
+  uuid: ^4.3.3
+  
+  # Advanced cryptography (Ed25519, RSA)
+  pointycastle: ^3.7.4
+  
+  # JSON serialization
+  json_annotation: ^4.8.1
+  
+  # Logging
+  logging: ^1.2.0
+  
+  # Cross-platform file handling
+  cross_file: ^0.3.4+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # Static analysis
+  flutter_lints: ^3.0.1
+  
+  # Testing framework
+  test: ^1.25.0
+  
+  # Mocking for tests
+  mockito: ^5.4.4
+  
+  # Code generation
+  build_runner: ^2.4.8
+  json_serializable: ^6.7.1
+  
+  # Test coverage
+  coverage: ^1.7.2
+
+flutter:
+  # No assets or plugins needed for now
+  uses-material-design: false
+

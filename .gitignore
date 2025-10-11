@@ -1,0 +1,79 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+
+# Coverage
+coverage/
+*.lcov
+
+# Test related
+.test_cache/
+test/.test_cache/
+
+# Exceptions to above rules.
+!**/ios/**/default.mode1v3
+!**/ios/**/default.mode2v3
+!**/ios/**/default.pbxuser
+!**/ios/**/default.perspectivev3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Android
+**/android/local.properties
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/key.properties
+
+# iOS/macOS
+**/ios/Pods/
+**/macos/Pods/
+**/ios/.symlinks/
+**/macos/.symlinks/
+**/ios/Flutter/flutter_export_environment.sh
+**/macos/Flutter/flutter_export_environment.sh
+
+# Reference JS client (node_modules)
+reference_js_client/node_modules/
+reference_js_client/package-lock.json
+
