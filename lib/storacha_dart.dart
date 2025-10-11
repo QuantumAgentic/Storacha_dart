@@ -22,3 +22,7 @@ export 'src/ipfs/multiformats/varint.dart';
 // Export UCAN utilities
 export 'src/ucan/capability.dart';
 export 'src/ucan/ucan.dart';
+
+// Export upload utilities
+export 'src/upload/blob.dart';
+export 'src/upload/upload_options.dart';

@@ -5,6 +5,9 @@ import 'package:dio/dio.dart';
 import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
+import 'package:storacha_dart/src/upload/blob.dart';
+import 'package:storacha_dart/src/upload/upload_options.dart';
 
 /// Main client for Storacha Network
 ///
@@ -129,6 +132,120 @@ class StorachaClient {
     }
 
     return true;
+  }
+
+  /// Upload a file to the current space
+  ///
+  /// Uploads a file to Storacha and returns the root CID of the generated DAG.
+  ///
+  /// Required:
+  /// - A current space must be selected
+  ///
+  /// Example:
+  /// ```dart
+  /// final file = MemoryFile(
+  ///   name: 'photo.jpg',
+  ///   bytes: imageBytes,
+  /// );
+  ///
+  /// final cid = await client.uploadFile(
+  ///   file,
+  ///   options: UploadFileOptions(
+  ///     onUploadProgress: (status) {
+  ///       print('Uploaded ${status.percentage}%');
+  ///     },
+  ///   ),
+  /// );
+  ///
+  /// print('File uploaded! CID: $cid');
+  /// ```
+  ///
+  /// Throws [StateError] if no space is currently selected.
+  Future<CID> uploadFile(
+    BlobLike file, {
+    UploadFileOptions? options,
+  }) async {
+    if (_currentSpace == null) {
+      throw StateError(
+        'No space selected. Call setCurrentSpace() or createSpace() first.',
+      );
+    }
+
+    // Implementation planned for future release
+    // Required steps:
+    // 1. UnixFS DAG encoding (encode file into IPLD blocks)
+    // 2. CAR file creation (bundle blocks into CAR format)
+    // 3. Shard large files into multiple CARs
+    // 4. Generate blob index
+    // 5. Upload blobs via space/blob/add capability
+    // 6. Register upload via upload/add capability
+    // 7. Submit to Filecoin via filecoin/offer capability
+    throw UnimplementedError(
+      'uploadFile is not yet implemented. '
+      'Requires UnixFS encoding and CAR file support. '
+      'Track progress at: https://github.com/storacha/storacha-dart',
+    );
+  }
+
+  /// Upload a directory of files to the current space
+  ///
+  /// Uploads multiple files as a directory structure and returns the root CID
+  /// of the generated DAG. File paths are preserved in the directory structure.
+  ///
+  /// Required:
+  /// - A current space must be selected
+  ///
+  /// Example:
+  /// ```dart
+  /// final files = [
+  ///   MemoryFile(name: 'README.md', bytes: readme),
+  ///   MemoryFile(name: 'src/main.dart', bytes: mainDart),
+  ///   MemoryFile(name: 'assets/logo.png', bytes: logo),
+  /// ];
+  ///
+  /// final cid = await client.uploadDirectory(
+  ///   files,
+  ///   options: UploadDirectoryOptions(
+  ///     customOrder: true,
+  ///     onUploadProgress: (status) {
+  ///       print('Progress: ${status.percentage}%');
+  ///     },
+  ///   ),
+  /// );
+  ///
+  /// print('Directory uploaded! Root CID: $cid');
+  /// ```
+  ///
+  /// Throws [StateError] if no space is currently selected.
+  /// Throws [ArgumentError] if the files list is empty.
+  Future<CID> uploadDirectory(
+    List<FileLike> files, {
+    UploadDirectoryOptions? options,
+  }) async {
+    if (_currentSpace == null) {
+      throw StateError(
+        'No space selected. Call setCurrentSpace() or createSpace() first.',
+      );
+    }
+
+    if (files.isEmpty) {
+      throw ArgumentError('Cannot upload an empty directory');
+    }
+
+    // Implementation planned for future release
+    // Required steps:
+    // 1. UnixFS directory DAG encoding (encode directory structure)
+    // 2. CAR file creation for all files and directory nodes
+    // 3. Shard large uploads into multiple CARs
+    // 4. Generate blob index
+    // 5. Upload blobs via space/blob/add capability
+    // 6. Register upload via upload/add capability
+    // 7. Submit to Filecoin via filecoin/offer capability
+    throw UnimplementedError(
+      'uploadDirectory is not yet implemented. '
+      'Requires UnixFS directory encoding and CAR file support. '
+      'Track progress at: https://github.com/storacha/storacha-dart',
+    );
   }
 
   /// Close the client and release resources

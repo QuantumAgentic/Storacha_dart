@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
 import 'package:storacha_dart/src/client/storacha_client.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
+import 'package:storacha_dart/src/upload/blob.dart';
+import 'package:storacha_dart/src/upload/upload_options.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -304,6 +309,133 @@ void main() {
 
       expect(str, contains('Test Space'));
       expect(str, contains(space.did));
+    });
+  });
+
+  group('Upload (stubs)', () {
+    late StorachaClient client;
+    late Signer principal;
+
+    setUp(() async {
+      principal = await Ed25519Signer.generate();
+      final config = ClientConfig(principal: principal);
+      client = StorachaClient(config);
+    });
+
+    tearDown(() {
+      client.close();
+    });
+
+    test('uploadFile throws StateError when no space selected', () {
+      final file = MemoryFile(
+        name: 'test.txt',
+        bytes: Uint8List.fromList(utf8.encode('test')),
+      );
+
+      expect(
+        () => client.uploadFile(file),
+        throwsStateError,
+      );
+    });
+
+    test('uploadFile throws UnimplementedError with space selected', () async {
+      await client.createSpace('Test Space');
+
+      final file = MemoryFile(
+        name: 'test.txt',
+        bytes: Uint8List.fromList(utf8.encode('test')),
+      );
+
+      expect(
+        () => client.uploadFile(file),
+        throwsUnimplementedError,
+      );
+    });
+
+    test('uploadFile accepts options', () async {
+      await client.createSpace('Test Space');
+
+      final file = MemoryFile(
+        name: 'test.txt',
+        bytes: Uint8List.fromList(utf8.encode('test')),
+      );
+
+      const options = UploadFileOptions(
+        retries: 5,
+        chunkSize: 256 * 1024,
+      );
+
+      expect(
+        () => client.uploadFile(file, options: options),
+        throwsUnimplementedError,
+      );
+    });
+
+    test('uploadDirectory throws StateError when no space selected', () {
+      final files = [
+        MemoryFile(
+          name: 'file1.txt',
+          bytes: Uint8List.fromList(utf8.encode('content1')),
+        ),
+      ];
+
+      expect(
+        () => client.uploadDirectory(files),
+        throwsStateError,
+      );
+    });
+
+    test('uploadDirectory throws ArgumentError for empty list', () async {
+      await client.createSpace('Test Space');
+
+      expect(
+        () => client.uploadDirectory([]),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+      'uploadDirectory throws UnimplementedError with valid input',
+      () async {
+        await client.createSpace('Test Space');
+
+        final files = [
+          MemoryFile(
+            name: 'README.md',
+            bytes: Uint8List.fromList(utf8.encode('# Project')),
+          ),
+          MemoryFile(
+            name: 'src/main.dart',
+            bytes: Uint8List.fromList(utf8.encode('void main() {}')),
+          ),
+        ];
+
+        expect(
+          () => client.uploadDirectory(files),
+          throwsUnimplementedError,
+        );
+      },
+    );
+
+    test('uploadDirectory accepts options', () async {
+      await client.createSpace('Test Space');
+
+      final files = [
+        MemoryFile(
+          name: 'file.txt',
+          bytes: Uint8List.fromList(utf8.encode('content')),
+        ),
+      ];
+
+      const options = UploadDirectoryOptions(
+        customOrder: true,
+        chunkSize: 128 * 1024,
+      );
+
+      expect(
+        () => client.uploadDirectory(files, options: options),
+        throwsUnimplementedError,
+      );
     });
   });
 }
