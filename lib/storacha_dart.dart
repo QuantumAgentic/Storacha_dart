@@ -4,4 +4,5 @@
 library storacha_dart;
 
 // Export IPFS multiformats utilities (internal for now, will be hidden later)
+export 'src/ipfs/multiformats/multibase.dart';
 export 'src/ipfs/multiformats/varint.dart';
