@@ -17,3 +17,8 @@ export 'src/ipfs/multiformats/varint.dart';
 // Export UCAN utilities
 export 'src/ucan/capability.dart';
 export 'src/ucan/ucan.dart';
+
+// Export client
+export 'src/client/client_config.dart';
+export 'src/client/space.dart';
+export 'src/client/storacha_client.dart';

@@ -1,0 +1,310 @@
+import 'package:storacha_dart/src/client/client_config.dart';
+import 'package:storacha_dart/src/client/space.dart';
+import 'package:storacha_dart/src/client/storacha_client.dart';
+import 'package:storacha_dart/src/crypto/signer.dart';
+import 'package:test/test.dart';
+
+void main() {
+  group('StorachaClient', () {
+    late StorachaClient client;
+    late Signer principal;
+
+    setUp(() async {
+      principal = await Ed25519Signer.generate();
+      final config = ClientConfig(principal: principal);
+      client = StorachaClient(config);
+    });
+
+    tearDown(() {
+      client.close();
+    });
+
+    group('initialization', () {
+      test('creates client with principal', () async {
+        expect(client.did(), isNotEmpty);
+        expect(client.did(), startsWith('did:key:'));
+      });
+
+      test('has default provider', () {
+        expect(client.defaultProvider(), 'did:web:storacha.network');
+      });
+
+      test('starts with no spaces', () {
+        expect(client.spaces(), isEmpty);
+        expect(client.currentSpace(), isNull);
+      });
+    });
+
+    group('createSpace', () {
+      test('creates a new space', () async {
+        final space = await client.createSpace('Test Space');
+
+        expect(space.name, 'Test Space');
+        expect(space.did, isNotEmpty);
+        expect(space.did, startsWith('did:key:'));
+        expect(space.createdAt, isNotNull);
+      });
+
+      test('adds space to spaces list', () async {
+        final space = await client.createSpace('Test Space');
+
+        expect(client.spaces(), contains(space));
+      });
+
+      test('sets first space as current', () async {
+        final space = await client.createSpace('First Space');
+
+        expect(client.currentSpace(), equals(space));
+      });
+
+      test('creates multiple spaces', () async {
+        final space1 = await client.createSpace('Space 1');
+        final space2 = await client.createSpace('Space 2');
+        final space3 = await client.createSpace('Space 3');
+
+        expect(client.spaces().length, 3);
+        expect(client.spaces(), containsAll([space1, space2, space3]));
+      });
+
+      test('creates space with custom signer', () async {
+        final customSigner = await Ed25519Signer.generate();
+        final space = await client.createSpace(
+          'Custom Space',
+          spaceSigner: customSigner,
+        );
+
+        expect(space.did, customSigner.did().did());
+      });
+
+      test('each space has unique DID', () async {
+        final space1 = await client.createSpace('Space 1');
+        final space2 = await client.createSpace('Space 2');
+
+        expect(space1.did, isNot(equals(space2.did)));
+      });
+    });
+
+    group('setCurrentSpace', () {
+      test('sets current space', () async {
+        final space1 = await client.createSpace('Space 1');
+        final space2 = await client.createSpace('Space 2');
+
+        client.setCurrentSpace(space2.did);
+        expect(client.currentSpace(), equals(space2));
+
+        client.setCurrentSpace(space1.did);
+        expect(client.currentSpace(), equals(space1));
+      });
+
+      test('throws on invalid space DID', () async {
+        await client.createSpace('Test Space');
+
+        expect(
+          () => client.setCurrentSpace('did:key:zinvalid'),
+          throwsArgumentError,
+        );
+      });
+    });
+
+    group('addSpace', () {
+      test('adds existing space', () async {
+        final signer = await Ed25519Signer.generate();
+        final space = Space(
+          did: signer.did().did(),
+          name: 'External Space',
+          signer: signer,
+        );
+
+        client.addSpace(space);
+
+        expect(client.spaces(), contains(space));
+      });
+
+      test('throws on duplicate space', () async {
+        final signer = await Ed25519Signer.generate();
+        final space = Space(
+          did: signer.did().did(),
+          name: 'Test Space',
+          signer: signer,
+        );
+
+        client.addSpace(space);
+
+        expect(() => client.addSpace(space), throwsArgumentError);
+      });
+
+      test('sets first added space as current', () async {
+        final signer = await Ed25519Signer.generate();
+        final space = Space(
+          did: signer.did().did(),
+          name: 'First Space',
+          signer: signer,
+        );
+
+        client.addSpace(space);
+
+        expect(client.currentSpace(), equals(space));
+      });
+    });
+
+    group('removeSpace', () {
+      test('removes space', () async {
+        final space = await client.createSpace('Test Space');
+
+        final removed = client.removeSpace(space.did);
+
+        expect(removed, isTrue);
+        expect(client.spaces(), isNot(contains(space)));
+      });
+
+      test('returns false for non-existent space', () {
+        final removed = client.removeSpace('did:key:zinvalid');
+
+        expect(removed, isFalse);
+      });
+
+      test('selects another space when current is removed', () async {
+        final space1 = await client.createSpace('Space 1');
+        final space2 = await client.createSpace('Space 2');
+
+        // Space 1 is current
+        expect(client.currentSpace(), equals(space1));
+
+        // Remove current space
+        client.removeSpace(space1.did);
+
+        // Space 2 should become current
+        expect(client.currentSpace(), equals(space2));
+      });
+
+      test('sets currentSpace to null when last space is removed', () async {
+        final space = await client.createSpace('Only Space');
+
+        client.removeSpace(space.did);
+
+        expect(client.currentSpace(), isNull);
+        expect(client.spaces(), isEmpty);
+      });
+    });
+
+    group('integration', () {
+      test('full space lifecycle', () async {
+        // Create first space
+        final space1 = await client.createSpace('Personal');
+        expect(client.currentSpace(), equals(space1));
+        expect(client.spaces().length, 1);
+
+        // Create second space
+        final space2 = await client.createSpace('Work');
+        expect(client.currentSpace(), equals(space1)); // Still first
+        expect(client.spaces().length, 2);
+
+        // Switch to second space
+        client.setCurrentSpace(space2.did);
+        expect(client.currentSpace(), equals(space2));
+
+        // Remove first space
+        client.removeSpace(space1.did);
+        expect(client.currentSpace(), equals(space2)); // Still second
+        expect(client.spaces().length, 1);
+
+        // Remove last space
+        client.removeSpace(space2.did);
+        expect(client.currentSpace(), isNull);
+        expect(client.spaces(), isEmpty);
+      });
+
+      test('client DID matches principal', () async {
+        final clientDid = client.did();
+        final principalDid = principal.did().did();
+
+        expect(clientDid, equals(principalDid));
+      });
+    });
+  });
+
+  group('ClientConfig', () {
+    test('creates config with defaults', () async {
+      final signer = await Ed25519Signer.generate();
+      final config = ClientConfig(principal: signer);
+
+      expect(config.endpoints, equals(StorachaEndpoints.production));
+      expect(config.defaultProvider, 'did:web:storacha.network');
+    });
+
+    test('creates config with custom endpoints', () async {
+      final signer = await Ed25519Signer.generate();
+      final config = ClientConfig(
+        principal: signer,
+        endpoints: StorachaEndpoints.staging,
+      );
+
+      expect(
+        config.endpoints.serviceUrl,
+        'https://staging.up.storacha.network',
+      );
+    });
+  });
+
+  group('Space', () {
+    test('creates space', () async {
+      final signer = await Ed25519Signer.generate();
+      final space = Space(
+        did: signer.did().did(),
+        name: 'Test Space',
+        signer: signer,
+      );
+
+      expect(space.name, 'Test Space');
+      expect(space.did, isNotEmpty);
+    });
+
+    test('converts to JSON', () async {
+      final signer = await Ed25519Signer.generate();
+      final space = Space(
+        did: signer.did().did(),
+        name: 'Test Space',
+        signer: signer,
+        createdAt: DateTime(2024, 1, 1),
+      );
+
+      final json = space.toJson();
+
+      expect(json['did'], space.did);
+      expect(json['name'], 'Test Space');
+      expect(json['createdAt'], isNotNull);
+    });
+
+    test('equality works correctly', () async {
+      final signer = await Ed25519Signer.generate();
+      final space1 = Space(
+        did: signer.did().did(),
+        name: 'Test Space',
+        signer: signer,
+      );
+      final space2 = Space(
+        did: signer.did().did(),
+        name: 'Test Space',
+        signer: signer,
+      );
+
+      expect(space1, equals(space2));
+      expect(space1.hashCode, equals(space2.hashCode));
+    });
+
+    test('toString provides useful info', () async {
+      final signer = await Ed25519Signer.generate();
+      final space = Space(
+        did: signer.did().did(),
+        name: 'Test Space',
+        signer: signer,
+      );
+
+      final str = space.toString();
+
+      expect(str, contains('Test Space'));
+      expect(str, contains(space.did));
+    });
+  });
+}
+
