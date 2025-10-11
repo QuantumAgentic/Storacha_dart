@@ -17,8 +17,11 @@ dependencies:
   # HTTP client with interceptors and advanced features
   dio: ^5.4.0
   
-  # Cryptographic functions
+  # Cryptographic functions (hash only)
   crypto: ^3.0.3
+  
+  # Ed25519, X25519, AES, etc.
+  cryptography: ^2.7.0
   
   # Base64, hex, and other encodings
   convert: ^3.1.1
