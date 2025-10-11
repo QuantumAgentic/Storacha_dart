@@ -1,7 +1,10 @@
 /// UCAN invocation builder for Storacha capabilities
 library;
 
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
+import 'package:storacha_dart/src/core/encoding.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
 import 'package:storacha_dart/src/ucan/capability.dart';
 
@@ -100,22 +103,35 @@ class InvocationBuilder {
   }
 
   /// Sign the invocation and return JWT
-  /// TODO(network): Implement JWT signing
+  ///
+  /// Returns a JWT in the format: `header.payload.signature`
+  /// - Header: `{"alg": "EdDSA", "typ": "JWT"}`
+  /// - Payload: UCAN invocation JSON
+  /// - Signature: Ed25519 signature of `header.payload`
   Future<String> sign({
     int? expiration,
     String? nonce,
   }) async {
-    build(
+    final invocation = build(
       expiration: expiration,
       nonce: nonce,
     );
 
-    // TODO(network): Implement proper JWT encoding and signing
-    // For now, throw unimplemented
-    throw UnimplementedError(
-      'UCAN JWT signing not yet implemented. '
-      'Requires base64url encoding, CBOR, and Ed25519 signature.',
-    );
+    // Step 1: Create JWT header
+    final header = {'alg': 'EdDSA', 'typ': 'JWT'};
+    final headerEncoded = Base64Url.encodeString(json.encode(header));
+
+    // Step 2: Create JWT payload (UCAN invocation)
+    final payload = invocation.toJson();
+    final payloadEncoded = Base64Url.encodeString(json.encode(payload));
+
+    // Step 3: Sign the JWT
+    final toSign = '$headerEncoded.$payloadEncoded';
+    final signature = await signer.sign(utf8.encode(toSign));
+    final signatureEncoded = Base64Url.encode(signature);
+
+    // Step 4: Return complete JWT
+    return '$toSign.$signatureEncoded';
   }
 }
 
