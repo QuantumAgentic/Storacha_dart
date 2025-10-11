@@ -90,16 +90,15 @@ class StorachaClient {
     _spaces.add(space);
 
     // Set as current space if it's the first one
-    if (_currentSpace == null) {
-      _currentSpace = space;
-    }
+    _currentSpace ??= space;
 
     return space;
   }
 
   /// Add an existing space to this client
   ///
-  /// Use this to add a space that was created elsewhere or restored from backup.
+  /// Use this to add a space that was created elsewhere
+  /// or restored from backup.
   void addSpace(Space space) {
     // Check if space already exists
     final exists = _spaces.any((s) => s.did == space.did);
@@ -110,9 +109,7 @@ class StorachaClient {
     _spaces.add(space);
 
     // Set as current space if it's the first one
-    if (_currentSpace == null) {
-      _currentSpace = space;
-    }
+    _currentSpace ??= space;
   }
 
   /// Remove a space from this client
@@ -139,4 +136,3 @@ class StorachaClient {
     _http.close();
   }
 }
-

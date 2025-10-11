@@ -117,7 +117,8 @@ void main() {
 
       test('throws on unsupported key type', () {
         // Create a DID with RSA code (0x1205) instead of Ed25519 (0xed)
-        const fakeDid = 'did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w';
+        const fakeDid = 'did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVt'
+            'Gc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w';
 
         // This should fail because we only support Ed25519 (0xed)
         expect(
@@ -252,4 +253,3 @@ void main() {
     });
   });
 }
-

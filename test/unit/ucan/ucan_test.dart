@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:storacha_dart/src/crypto/signer.dart';
 import 'package:storacha_dart/src/ucan/capability.dart';
 import 'package:storacha_dart/src/ucan/ucan.dart';
@@ -407,4 +405,3 @@ void main() {
     });
   });
 }
-

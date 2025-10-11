@@ -33,22 +33,12 @@ class Space {
   /// Creation timestamp
   final DateTime? createdAt;
 
-  /// Create Space from JSON
-  factory Space.fromJson(Map<String, dynamic> json) {
-    throw UnimplementedError(
-      'Space.fromJson requires a Signer instance. '
-      'Use Space constructor directly.',
-    );
-  }
-
   /// Convert Space to JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'did': did,
-      'name': name,
-      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'did': did,
+        'name': name,
+        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+      };
 
   @override
   bool operator ==(Object other) =>
@@ -61,4 +51,3 @@ class Space {
   @override
   String toString() => 'Space(did: $did, name: $name)';
 }
-

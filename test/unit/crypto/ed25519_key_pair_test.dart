@@ -155,7 +155,8 @@ void main() {
         final keyPair = await Ed25519KeyPair.generate();
 
         // Simulate a real IPFS CID
-        final cid = 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi';
+        const cid =
+            'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi';
         final message = utf8.encode(cid);
         final messageBytes = Uint8List.fromList(message);
 
@@ -192,4 +193,3 @@ void main() {
     });
   });
 }
-

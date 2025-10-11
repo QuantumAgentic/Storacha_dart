@@ -91,8 +91,8 @@ class Ed25519KeyPair {
   }
 
   // Needed for value equality testing
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Ed25519KeyPair &&
@@ -100,8 +100,8 @@ class Ed25519KeyPair {
           _bytesEqual(privateKey, other.privateKey);
 
   // Needed for value equality testing
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   int get hashCode => publicKey.length.hashCode ^ privateKey.length.hashCode;
 
   bool _bytesEqual(Uint8List a, Uint8List b) {

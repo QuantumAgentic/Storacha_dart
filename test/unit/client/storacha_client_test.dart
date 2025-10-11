@@ -265,7 +265,7 @@ void main() {
         did: signer.did().did(),
         name: 'Test Space',
         signer: signer,
-        createdAt: DateTime(2024, 1, 1),
+        createdAt: DateTime(2024),
       );
 
       final json = space.toJson();
@@ -307,4 +307,3 @@ void main() {
     });
   });
 }
-

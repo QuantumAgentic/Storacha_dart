@@ -83,7 +83,8 @@ void main() {
         expect(json['with'], 'ipfs://bafybei...');
         expect(json['can'], 'upload/*');
         expect(json['nb'], isNotNull);
-        expect(json['nb']['link'], 'bafybei...');
+        final nb = json['nb'] as Map<String, dynamic>;
+        expect(nb['link'], 'bafybei...');
       });
 
       test('omits empty caveats from JSON', () {
@@ -218,4 +219,3 @@ void main() {
     });
   });
 }
-

@@ -115,26 +115,24 @@ class UCANPayload {
   final List<CID> proofs;
 
   /// Create from JSON
-  factory UCANPayload.fromJson(Map<String, dynamic> json) {
-    return UCANPayload(
-      issuer: json['iss'] as String,
-      audience: json['aud'] as String,
-      capabilities: (json['att'] as List)
-          .map((c) => Capability.fromJson(c as Map<String, dynamic>))
-          .toList(),
-      expiration: json['exp'] as int?,
-      notBefore: json['nbf'] as int?,
-      nonce: json['nnc'] as String?,
-      facts: (json['fct'] as List?)
-              ?.map((f) => f as Map<String, dynamic>)
-              .toList() ??
-          [],
-      proofs: (json['prf'] as List?)
-              ?.map((p) => CID.parse(p as String))
-              .toList() ??
-          [],
-    );
-  }
+  factory UCANPayload.fromJson(Map<String, dynamic> json) => UCANPayload(
+        issuer: json['iss'] as String,
+        audience: json['aud'] as String,
+        capabilities: (json['att'] as List)
+            .map((c) => Capability.fromJson(c as Map<String, dynamic>))
+            .toList(),
+        expiration: json['exp'] as int?,
+        notBefore: json['nbf'] as int?,
+        nonce: json['nnc'] as String?,
+        facts: (json['fct'] as List?)
+                ?.map((f) => f as Map<String, dynamic>)
+                .toList() ??
+            [],
+        proofs: (json['prf'] as List?)
+                ?.map((p) => CID.parse(p as String))
+                .toList() ??
+            [],
+      );
 
   /// Convert to JSON
   Map<String, dynamic> toJson() {

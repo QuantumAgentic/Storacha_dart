@@ -45,4 +45,3 @@ class ClientConfig {
   /// Default service provider DID
   final String defaultProvider;
 }
-
