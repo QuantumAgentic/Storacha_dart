@@ -4,11 +4,75 @@ import 'dart:typed_data';
 import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
 import 'package:storacha_dart/src/client/storacha_client.dart';
+import 'package:storacha_dart/src/core/network_retry.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
+import 'package:storacha_dart/src/transport/storacha_transport.dart';
+import 'package:storacha_dart/src/ucan/capability_types.dart';
+import 'package:storacha_dart/src/ucan/invocation.dart';
 import 'package:storacha_dart/src/upload/blob.dart';
 import 'package:storacha_dart/src/upload/upload_options.dart';
 import 'package:test/test.dart';
+
+/// Mock transport for testing that always succeeds
+class MockStorachaTransport implements StorachaTransport {
+  @override
+  String get endpoint => 'https://test.storacha.network';
+
+  @override
+  RetryConfig get retryConfig => RetryPresets.fast;
+
+  @override
+  Future<Map<String, dynamic>> invokeCapability({
+    required InvocationBuilder builder,
+    int? expiration,
+    String? nonce,
+  }) async {
+    // Return mock successful response
+    return <String, dynamic>{'ok': <String, dynamic>{}};
+  }
+
+  @override
+  Future<BlobAllocation> invokeBlobAdd({
+    required String spaceDid,
+    required BlobDescriptor blob,
+    required InvocationBuilder builder,
+  }) async {
+    // Return success allocation
+    return const BlobAllocation(
+      allocated: true,
+      url: 'https://test.upload.url/blob',
+      headers: {'x-test': 'true'},
+    );
+  }
+
+  @override
+  Future<void> uploadBlob({
+    required String url,
+    required Uint8List data,
+    required Map<String, String> headers,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    // Simulate successful upload
+    onProgress?.call(data.length, data.length);
+  }
+
+  @override
+  Future<UploadResult> invokeUploadAdd({
+    required String spaceDid,
+    required CID root,
+    required List<CID> shards,
+    required InvocationBuilder builder,
+  }) async {
+    // Return the root CID as result
+    return UploadResult(root: root, shards: shards);
+  }
+
+  @override
+  void close() {
+    // Nothing to close in mock
+  }
+}
 
 void main() {
   group('StorachaClient', () {
@@ -18,7 +82,7 @@ void main() {
     setUp(() async {
       principal = await Ed25519Signer.generate();
       final config = ClientConfig(principal: principal);
-      client = StorachaClient(config);
+      client = StorachaClient(config, transport: MockStorachaTransport());
     });
 
     tearDown(() {
@@ -320,7 +384,7 @@ void main() {
     setUp(() async {
       principal = await Ed25519Signer.generate();
       final config = ClientConfig(principal: principal);
-      client = StorachaClient(config);
+      client = StorachaClient(config, transport: MockStorachaTransport());
     });
 
     tearDown(() {

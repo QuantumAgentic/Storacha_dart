@@ -1,6 +1,8 @@
 /// Main Storacha client for interacting with the Storacha Network
 library;
 
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
@@ -8,8 +10,13 @@ import 'package:storacha_dart/src/crypto/signer.dart';
 import 'package:storacha_dart/src/ipfs/car/car_encoder.dart';
 import 'package:storacha_dart/src/ipfs/car/car_types.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/multihash.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_encoder.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_types.dart';
+import 'package:storacha_dart/src/transport/storacha_transport.dart';
+import 'package:storacha_dart/src/ucan/capability.dart';
+import 'package:storacha_dart/src/ucan/capability_types.dart';
+import 'package:storacha_dart/src/ucan/invocation.dart';
 import 'package:storacha_dart/src/upload/blob.dart';
 import 'package:storacha_dart/src/upload/upload_options.dart';
 
@@ -21,7 +28,7 @@ import 'package:storacha_dart/src/upload/upload_options.dart';
 /// - UCAN delegation
 /// - Storage proofs and receipts
 class StorachaClient {
-  StorachaClient(ClientConfig config)
+  StorachaClient(ClientConfig config, {StorachaTransport? transport})
       : _config = config,
         _http = Dio(
           BaseOptions(
@@ -33,10 +40,12 @@ class StorachaClient {
               'User-Agent': 'storacha-dart/0.1.0',
             },
           ),
-        );
+        ),
+        _transport = transport ?? StorachaTransport();
 
   final ClientConfig _config;
   final Dio _http;
+  final StorachaTransport _transport;
 
   /// Currently selected space
   Space? _currentSpace;
@@ -142,6 +151,13 @@ class StorachaClient {
   ///
   /// Uploads a file to Storacha and returns the root CID of the generated DAG.
   ///
+  /// This performs the complete upload flow:
+  /// 1. Encode file to UnixFS DAG
+  /// 2. Package into CAR format
+  /// 3. Request blob allocation from Storacha
+  /// 4. Upload CAR file to allocated URL
+  /// 5. Register upload with Storacha service
+  ///
   /// Required:
   /// - A current space must be selected
   ///
@@ -165,6 +181,7 @@ class StorachaClient {
   /// ```
   ///
   /// Throws [StateError] if no space is currently selected.
+  /// Throws [StorachaException] if the upload fails.
   Future<CID> uploadFile(
     BlobLike file, {
     UploadFileOptions? options,
@@ -200,28 +217,82 @@ class StorachaClient {
       blocks: carBlocks,
     );
 
-    // TODO(upload): Network upload implementation required
-    // Remaining tasks:
-    // - HTTP client integration with Dio
-    // - UCAN authorization headers
-    // - space/blob/add capability invocation
-    // - upload/add capability registration
-    // - Proper error handling and retries
-    // - Background upload support for mobile
-    //
-    // Currently returns root CID after local encoding only
+    // Step 4: Calculate CAR digest for blob descriptor
+    final carMultihash = sha256Hash(carBytes);
+    final carDigest = carMultihash.digest;
 
-    // Track upload progress if callback provided
-    if (options?.onUploadProgress != null) {
-      options!.onUploadProgress!(
-        ProgressStatus(
-          loaded: carBytes.length,
-          total: carBytes.length,
-        ),
+    // Step 5: Request blob allocation (space/blob/add capability)
+    final blobDescriptor = BlobDescriptor(
+      digest: carDigest,
+      size: carBytes.length,
+    );
+
+    final blobCapability = Capability(
+      with_: _currentSpace!.did,
+      can: 'space/blob/add',
+      nb: {
+        'blob': {
+          'digest': carDigest,
+          'size': carBytes.length,
+        },
+      },
+    );
+
+    final blobBuilder = InvocationBuilder(signer: _config.principal)
+      ..addCapability(blobCapability);
+
+    final allocation = await _transport.invokeBlobAdd(
+      spaceDid: _currentSpace!.did,
+      blob: blobDescriptor,
+      builder: blobBuilder,
+    );
+
+    // Step 6: Upload CAR file to allocated URL (if newly allocated)
+    if (allocation.allocated && allocation.url != null) {
+      await _transport.uploadBlob(
+        url: allocation.url!,
+        data: Uint8List.fromList(carBytes),
+        headers: allocation.headers ?? {},
+        onProgress: options?.onUploadProgress != null
+            ? (sent, total) {
+                options!.onUploadProgress!(
+                  ProgressStatus(loaded: sent, total: total),
+                );
+              }
+            : null,
       );
+    } else {
+      // Blob already exists, just notify 100% progress
+      if (options?.onUploadProgress != null) {
+        options!.onUploadProgress!(
+          ProgressStatus(loaded: carBytes.length, total: carBytes.length),
+        );
+      }
     }
 
-    return unixfsResult.rootCID;
+    // Step 7: Register upload (upload/add capability)
+    final carCid = CID.createV1(rawCode, carMultihash);
+
+    final uploadCapability = Capability(
+      with_: _currentSpace!.did,
+      can: 'upload/add',
+      nb: {
+        'root': unixfsResult.rootCID.toString(),
+        'shards': [carCid.toString()],
+      },
+    );
+
+    final uploadBuilder = InvocationBuilder(signer: _config.principal)
+      ..addCapability(uploadCapability);
+
+    final uploadResult = await _transport.invokeUploadAdd(
+      spaceDid: _currentSpace!.did,
+      root: unixfsResult.rootCID,
+      shards: [carCid],
+      builder: uploadBuilder,
+    );
+
+    return uploadResult.root;
   }
 
   /// Upload a directory of files to the current space
@@ -288,5 +359,6 @@ class StorachaClient {
   /// Close the client and release resources
   void close() {
     _http.close();
+    _transport.close();
   }
 }
