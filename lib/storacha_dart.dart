@@ -25,4 +25,5 @@ export 'src/ucan/ucan.dart';
 
 // Export upload utilities
 export 'src/upload/blob.dart';
+export 'src/upload/progress_throttle.dart';
 export 'src/upload/upload_options.dart';
