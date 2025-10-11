@@ -13,3 +13,7 @@ export 'src/ipfs/multiformats/cid.dart';
 export 'src/ipfs/multiformats/multibase.dart';
 export 'src/ipfs/multiformats/multihash.dart';
 export 'src/ipfs/multiformats/varint.dart';
+
+// Export UCAN utilities
+export 'src/ucan/capability.dart';
+export 'src/ucan/ucan.dart';
