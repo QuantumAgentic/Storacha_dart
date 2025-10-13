@@ -335,14 +335,33 @@ class StorachaClient {
       }
     }
 
-    final uploadResult = await _transport.invokeUploadAdd(
-      spaceDid: _currentSpace!.did,
-      root: unixfsResult.rootCID,
-      shards: [carCid],
-      builder: uploadBuilder,
-    );
+    // Retry logic for TransactionConflict errors (Storacha race conditions)
+    int retries = 0;
+    const maxRetries = 3;
+    const retryDelay = Duration(milliseconds: 500);
+    
+    while (true) {
+      try {
+        final uploadResult = await _transport.invokeUploadAdd(
+          spaceDid: _currentSpace!.did,
+          root: unixfsResult.rootCID,
+          shards: [carCid],
+          builder: uploadBuilder,
+        );
 
-    return uploadResult.root;
+        return uploadResult.root;
+      } catch (e) {
+        // Check if it's a TransactionConflict and we can retry
+        if (retries < maxRetries && 
+            e.toString().contains('TransactionConflict')) {
+          retries++;
+          print('⚠️  Storacha TransactionConflict, retry $retries/$maxRetries...');
+          await Future.delayed(retryDelay * retries); // Exponential backoff
+          continue;
+        }
+        rethrow; // Other errors or max retries reached
+      }
+    }
   }
 
   /// Upload a directory of files to the current space
