@@ -17,6 +17,105 @@ A Dart/Flutter client library for [Storacha Network](https://storacha.network) (
 - 🎯 **Type-safe** - Full Dart type safety with null safety
 - 🧪 **Well tested** - >80% code coverage
 
+## 🎉 Storacha Network Support
+
+### ✅ Current Status (v0.1.0+)
+
+This package now includes **UCAN delegation support** and is **production-ready** for:
+- ✅ Local IPFS nodes
+- ✅ Custom storage providers
+- ✅ Development and testing
+- ✅ Content-addressable encoding
+- ✅ **UCAN delegation loading** - Load delegations from Storacha CLI
+- ✅ **Delegated uploads** - Upload to production Storacha network with delegations
+
+### 🔜 Coming Soon
+
+Additional features in development:
+- 📡 **Space delegation API** - Programmatic space delegation without CLI (currently requires Storacha CLI)
+
+### 💡 Using Delegations
+
+Upload files to Storacha using delegations created by the Storacha CLI. Delegations allow you to grant specific permissions (like `space/blob/add` and `upload/add`) to an agent without sharing your account credentials.
+
+#### Quick Start with Delegations
+
+1. **Install Storacha CLI**: 
+   ```bash
+   npm install -g @storacha/cli
+   ```
+
+2. **Login and create a space**:
+   ```bash
+   storacha login your@email.com
+   storacha space create my-app-space
+   ```
+
+3. **Get your agent DID** (from your Dart app):
+   ```dart
+   final agent = await Ed25519Signer.generate();
+   print('Agent DID: ${agent.did().did()}');
+   // Example output: did:key:z6MkqTtiRFtW67NtYNgGD5mGWCh3UJbYwLDNmXbQFjz4zqrz
+   ```
+
+4. **Create delegation** (choose one format):
+
+   **Option A: Binary CAR format** (recommended):
+   ```bash
+   storacha delegation create <AGENT_DID> \
+     --can 'space/blob/add' \
+     --can 'upload/add' \
+     --can 'space/index/add' \
+     --output delegation.car
+   ```
+
+   **Option B: Base64 identity CID format**:
+   ```bash
+   storacha delegation create <AGENT_DID> \
+     --can 'space/blob/add' \
+     --can 'upload/add' \
+     --can 'space/index/add' \
+     --base64 > delegation.txt
+   ```
+
+5. **Use in your app**:
+   ```dart
+   // Load delegation (automatically detects format)
+   final delegation = await Delegation.fromFile('delegation.car');
+   
+   // Use it with your client
+   final config = StorachaConfig(
+     principal: agent,
+     delegations: [delegation],
+   );
+   final client = StorachaClient(config: config);
+   ```
+
+#### Supported Delegation Formats
+
+The package automatically detects and parses both formats:
+
+- **Binary CAR** (`.car`): IPLD CAR file containing the full UCAN proof chain
+- **Base64 Identity CID** (`.txt`): Base64-encoded identity CID (multibase format)
+
+Both formats work identically - use whichever is more convenient for your workflow.
+
+#### Required Capabilities
+
+For uploading files, you need these capabilities:
+- `space/blob/add` - Add raw blobs to the space
+- `upload/add` - Register DAG structures
+- `space/index/add` - Index uploaded content (optional but recommended)
+
+### 📚 New to Storacha? Start Here!
+
+**Confused about delegations?** Read this first:
+
+- 🎯 **[STORACHA_GUIDE.md](../STORACHA_GUIDE.md)** - Quick answer to your questions (5 min)
+- 🚀 **[CLI Quick Start](docs/QUICKSTART_CLI.md)** - Upload files now (30 min)
+
+**In French 🇫🇷** (English coming soon)
+
 ## Installation
 
 Add to your `pubspec.yaml`:
@@ -94,6 +193,71 @@ print('Directory uploaded! CID: $dirCid');
 ```
 
 ## Usage Examples
+
+### Upload with delegations (Storacha CLI)
+
+Use delegations created by Storacha CLI to upload to spaces you don't own. Supports both JWT and CAR formats:
+
+```dart
+import 'package:storacha_dart/storacha_dart.dart';
+
+// 1. Load delegation from file (created by Storacha CLI)
+final delegation = await Delegation.fromFile('delegation.ucan');
+
+// 2. Create client with delegation
+final agent = await Ed25519Signer.generate();
+final config = ClientConfig(
+  principal: agent,
+  defaultProvider: 'did:web:up.storacha.network',
+);
+
+final client = StorachaClient(
+  config,
+  delegations: [delegation],
+);
+
+// 3. Add the delegated space
+final spaceDid = delegation.capabilities.first.with_; // Extract space DID
+final space = Space(
+  did: spaceDid,
+  name: 'Delegated Space',
+  signer: agent,
+  createdAt: DateTime.now(),
+);
+
+client.addSpace(space);
+client.setCurrentSpace(spaceDid);
+
+// 4. Upload files (proofs automatically included)
+final cid = await client.uploadFile(
+  MemoryFile(name: 'photo.jpg', bytes: photoBytes),
+);
+
+print('Uploaded! CID: $cid');
+```
+
+**Creating delegations with Storacha CLI:**
+
+```bash
+# Install CLI
+npm install -g @storacha/cli
+
+# Login and create space
+storacha login your@email.com
+storacha space create my-app
+
+# Get your agent DID (from your Dart app)
+# Then create delegation with the exact capabilities you need
+storacha delegation create did:key:z6Mk... \
+  -c space/blob/add \
+  -c space/index/add \
+  -c upload/add \
+  --base64 > delegation.txt
+```
+
+The `--base64` flag outputs the delegation in a base64-encoded CAR format that includes the full proof chain. The package automatically handles this format when loading from file.
+
+See `storacha_test_app/bin/upload_with_delegation.dart` for a complete working example.
 
 ### Upload with progress tracking
 

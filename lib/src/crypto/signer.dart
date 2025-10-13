@@ -76,12 +76,19 @@ class Ed25519Signer implements Signer {
 
   /// Import signer from exported bytes
   static Future<Ed25519Signer> import(Uint8List bytes) async {
-    // Format: <private-code><private-key><public-code><public-key>
-    // We only need the private key to reconstruct everything
-    final privateCodeLen = varint.encodingLength(ed25519PrivateCode);
-    final privateKey = bytes.sublist(privateCodeLen, privateCodeLen + 32);
-
-    return Ed25519Signer.fromPrivateKey(privateKey);
+    // Support multiple formats for compatibility:
+    // 1. Simple format (32 bytes): just the private key (new format, compatible with JS derive())
+    // 2. Legacy format (65+ bytes): <private-code><private-key><public-code><public-key>
+    
+    if (bytes.length == 32) {
+      // Simple format: just the private key
+      return Ed25519Signer.fromPrivateKey(bytes);
+    } else {
+      // Legacy format with multicodec prefixes
+      final privateCodeLen = varint.encodingLength(ed25519PrivateCode);
+      final privateKey = bytes.sublist(privateCodeLen, privateCodeLen + 32);
+      return Ed25519Signer.fromPrivateKey(privateKey);
+    }
   }
 
   /// The Ed25519 key pair
@@ -104,41 +111,10 @@ class Ed25519Signer implements Signer {
 
   @override
   Uint8List? export() {
-    // Format: <private-code><private-key><public-code><public-key>
-    // Similar to @ucanto/principal format
-    final privateCodeBytes = varint.encode(ed25519PrivateCode);
-    final publicCodeBytes = varint.encode(ed25519Code);
-
-    final totalLength = privateCodeBytes.length +
-        keyPair.privateKey.length +
-        publicCodeBytes.length +
-        keyPair.publicKey.length;
-
-    final bytes = Uint8List(totalLength);
-    var offset = 0;
-
-    // Private key with code
-    bytes.setRange(offset, offset + privateCodeBytes.length, privateCodeBytes);
-    offset += privateCodeBytes.length;
-
-    bytes.setRange(
-      offset,
-      offset + keyPair.privateKey.length,
-      keyPair.privateKey,
-    );
-    offset += keyPair.privateKey.length;
-
-    // Public key with code
-    bytes.setRange(offset, offset + publicCodeBytes.length, publicCodeBytes);
-    offset += publicCodeBytes.length;
-
-    bytes.setRange(
-      offset,
-      offset + keyPair.publicKey.length,
-      keyPair.publicKey,
-    );
-
-    return bytes;
+    // Export only the 32-byte private key
+    // This format is compatible with @ucanto/principal/ed25519 derive()
+    // The JavaScript client can derive the full key pair from just the private key
+    return Uint8List.fromList(keyPair.privateKey);
   }
 
   /// Get the public key bytes

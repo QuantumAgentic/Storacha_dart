@@ -17,6 +17,7 @@ import 'package:storacha_dart/src/transport/storacha_transport.dart';
 import 'package:storacha_dart/src/ucan/capability.dart';
 import 'package:storacha_dart/src/ucan/capability_types.dart';
 import 'package:storacha_dart/src/ucan/invocation.dart';
+import 'package:storacha_dart/src/ucan/delegation.dart';
 import 'package:storacha_dart/src/upload/blob.dart';
 import 'package:storacha_dart/src/upload/upload_options.dart';
 
@@ -28,8 +29,11 @@ import 'package:storacha_dart/src/upload/upload_options.dart';
 /// - UCAN delegation
 /// - Storage proofs and receipts
 class StorachaClient {
-  StorachaClient(ClientConfig config, {StorachaTransport? transport})
-      : _config = config,
+  StorachaClient(
+    ClientConfig config, {
+    StorachaTransport? transport,
+    List<Delegation>? delegations,
+  })  : _config = config,
         _http = Dio(
           BaseOptions(
             baseUrl: config.endpoints.serviceUrl,
@@ -41,11 +45,13 @@ class StorachaClient {
             },
           ),
         ),
-        _transport = transport ?? StorachaTransport();
+        _transport = transport ?? StorachaTransport(),
+        _delegationStore = DelegationStore(delegations);
 
   final ClientConfig _config;
   final Dio _http;
   final StorachaTransport _transport;
+  final DelegationStore _delegationStore;
 
   /// Currently selected space
   Space? _currentSpace;
@@ -64,6 +70,29 @@ class StorachaClient {
 
   /// List all spaces
   List<Space> spaces() => List.unmodifiable(_spaces);
+
+  /// Get the delegation store for managing delegations
+  DelegationStore get delegations => _delegationStore;
+
+  /// Add a delegation to this client
+  /// 
+  /// Delegations are UCAN tokens that grant this client's agent
+  /// permission to act on spaces it doesn't own.
+  /// 
+  /// Example:
+  /// ```dart
+  /// // Load delegation created by Storacha CLI
+  /// final delegation = await Delegation.fromFile('proof.ucan');
+  /// client.addDelegation(delegation);
+  /// ```
+  void addDelegation(Delegation delegation) {
+    _delegationStore.add(delegation);
+  }
+
+  /// Add multiple delegations
+  void addDelegations(List<Delegation> delegations) {
+    _delegationStore.addAll(delegations);
+  }
 
   /// Set the current space
   ///
@@ -241,6 +270,16 @@ class StorachaClient {
     final blobBuilder = InvocationBuilder(signer: _config.principal)
       ..addCapability(blobCapability);
 
+    // Add delegation proofs if available
+    final blobDelegations = _delegationStore.valid
+        .where((d) => d.grantsCapability('space/blob/add', resource: _currentSpace!.did))
+        .where((d) => d.audience == _config.principal.did().did());
+    for (final delegation in blobDelegations) {
+      if (delegation.archive != null) {
+        blobBuilder.addProofArchive(delegation.archive!);
+      }
+    }
+
     final allocation = await _transport.invokeBlobAdd(
       spaceDid: _currentSpace!.did,
       blob: blobDescriptor,
@@ -271,19 +310,30 @@ class StorachaClient {
     }
 
     // Step 7: Register upload (upload/add capability)
-    final carCid = CID.createV1(rawCode, carMultihash);
+    // Create CID for the CAR file (codec 0x202)
+    final carCid = CID.createV1(carCode, carMultihash);
 
     final uploadCapability = Capability(
       with_: _currentSpace!.did,
       can: 'upload/add',
       nb: {
-        'root': unixfsResult.rootCID.toString(),
-        'shards': [carCid.toString()],
+        'root': unixfsResult.rootCID, // Keep as CID object for DAG-CBOR encoding
+        'shards': [carCid], // Keep as CID objects for DAG-CBOR encoding
       },
     );
 
     final uploadBuilder = InvocationBuilder(signer: _config.principal)
       ..addCapability(uploadCapability);
+
+    // Add delegation proofs if available
+    final uploadDelegations = _delegationStore.valid
+        .where((d) => d.grantsCapability('upload/add', resource: _currentSpace!.did))
+        .where((d) => d.audience == _config.principal.did().did());
+    for (final delegation in uploadDelegations) {
+      if (delegation.archive != null) {
+        uploadBuilder.addProofArchive(delegation.archive!);
+      }
+    }
 
     final uploadResult = await _transport.invokeUploadAdd(
       spaceDid: _currentSpace!.did,

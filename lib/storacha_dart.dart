@@ -18,6 +18,7 @@ export 'src/crypto/ed25519_key_pair.dart';
 export 'src/crypto/signer.dart';
 
 // Export IPFS CAR utilities
+export 'src/ipfs/car/car_decoder.dart';
 export 'src/ipfs/car/car_encoder.dart';
 export 'src/ipfs/car/car_types.dart';
 
@@ -39,9 +40,13 @@ export 'src/transport/storacha_transport.dart';
 // Export UCAN utilities
 export 'src/ucan/capability.dart';
 export 'src/ucan/capability_types.dart';
+export 'src/ucan/delegation.dart';
 export 'src/ucan/invocation.dart';
-export 'src/ucan/invocation_encoder.dart';
+export 'src/ucan/invocation_ipld.dart';
 export 'src/ucan/ucan.dart';
+
+// Export DAG-CBOR encoder (hide dagCborCode to avoid conflict with CID module)
+export 'src/core/dag_cbor_encoder.dart' hide dagCborCode;
 
 // Export upload utilities
 export 'src/upload/blob.dart';

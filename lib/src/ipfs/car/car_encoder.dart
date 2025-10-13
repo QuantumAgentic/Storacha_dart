@@ -46,12 +46,10 @@ Uint8List encodeCar({
 
 /// Encodes a CAR header to CBOR format.
 Uint8List _encodeCarHeader(CARHeader header) {
-    // CBOR encoding for { version: 1, roots: [CID, ...] }
+    // CBOR encoding for { roots: [CID, ...], version: 1 }
+    // IMPORTANT: Keys must be in alphabetical order for canonical CBOR
     final builder = BytesBuilder()
       ..addByte(0xA2) // CBOR major type 5 (map), additional info 2
-      ..addByte(0x67) // CBOR text string, length 7
-      ..add('version'.codeUnits)
-      ..addByte(0x01) // CBOR major type 0, value 1
       ..addByte(0x65) // CBOR text string, length 5
       ..add('roots'.codeUnits);
 
@@ -68,10 +66,16 @@ Uint8List _encodeCarHeader(CARHeader header) {
       builder.addByte(rootCount & 0xFF);
     }
 
-    // Encode each CID as CBOR bytes
+    // Encode each CID as CBOR tag 42 + bytes (with 0x00 prefix)
     for (final cid in header.roots) {
+      // Add CBOR tag 42 for CID
+      builder
+        ..addByte(0xD8) // CBOR tag (major type 6, additional info 24)
+        ..addByte(0x2A); // Tag number 42
+
+      // CID bytes with 0x00 multibase prefix
       final cidBytes = cid.bytes;
-      final length = cidBytes.length;
+      final length = cidBytes.length + 1; // +1 for the 0x00 prefix
 
       if (length < 24) {
         builder.addByte(0x40 | length); // CBOR byte string, length < 24
@@ -84,8 +88,16 @@ Uint8List _encodeCarHeader(CARHeader header) {
         builder.addByte(length & 0xFF);
       }
 
-      builder.add(cidBytes);
+      builder
+        ..addByte(0x00) // Multibase identity prefix
+        ..add(cidBytes);
     }
+
+    // Add version after roots (alphabetical order: roots < version)
+    builder
+      ..addByte(0x67) // CBOR text string, length 7
+      ..add('version'.codeUnits)
+      ..addByte(0x01); // CBOR major type 0, value 1
 
     return builder.toBytes();
   }

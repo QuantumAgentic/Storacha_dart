@@ -15,6 +15,7 @@ import 'package:storacha_dart/src/ipfs/multiformats/varint.dart' as varint;
 /// Multicodec codes
 const int dagPbCode = 0x70; // dag-pb
 const int rawCode = 0x55; // raw binary
+const int carCode = 0x202; // CAR file
 const int dagCborCode = 0x71; // dag-cbor
 const int dagJsonCode = 0x0129; // dag-json
 

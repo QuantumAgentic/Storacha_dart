@@ -1,15 +1,17 @@
 /// UCAN invocation builder for Storacha capabilities
 library;
 
-import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
-import 'package:storacha_dart/src/core/encoding.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
+import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
 import 'package:storacha_dart/src/ucan/capability.dart';
+import 'package:storacha_dart/src/ucan/invocation_ipld.dart';
 
-/// UCAN Invocation for executing capabilities
+/// Legacy UCAN Invocation (kept for compatibility, but not used for new invocations)
 @immutable
+@Deprecated('Use IPLDInvocation instead')
 class UcanInvocation {
   const UcanInvocation({
     required this.issuer,
@@ -29,7 +31,7 @@ class UcanInvocation {
   /// Capabilities being invoked
   final List<Capability> capabilities;
 
-  /// Proof UCANs (delegations)
+  /// Proof UCANs (delegations)  
   final List<String> proofs;
 
   /// Expiration timestamp (Unix seconds)
@@ -54,12 +56,18 @@ class UcanInvocation {
       'UcanInvocation(iss: $issuer, aud: $audience, caps: ${capabilities.length})';
 }
 
-/// Builder for creating UCAN invocations
+/// Builder for creating UCAN invocations (IPLD format)
+/// 
+/// This builder creates invocations in the ucanto/message@7.0.0 format,
+/// not JWT. The old JWT format is deprecated.
 class InvocationBuilder {
   InvocationBuilder({
     required this.signer,
     this.audience = 'did:web:up.storacha.network',
-  });
+  }) : _ipldBuilder = IPLDInvocationBuilder(
+          signer: signer,
+          audience: audience,
+        );
 
   /// Signer (agent) creating the invocation
   final Signer signer;
@@ -67,71 +75,61 @@ class InvocationBuilder {
   /// Service audience
   final String audience;
 
-  /// List of capabilities to invoke
-  final List<Capability> _capabilities = [];
-
-  /// Proof UCANs
-  final List<String> _proofs = [];
+  /// Internal IPLD builder
+  final IPLDInvocationBuilder _ipldBuilder;
 
   /// Add a capability to invoke
   void addCapability(Capability capability) {
-    _capabilities.add(capability);
+    _ipldBuilder.addCapability(capability);
   }
 
-  /// Add a proof UCAN
-  void addProof(String proof) {
-    _proofs.add(proof);
+  /// Add a proof CID (from delegation)
+  void addProof(String proofCid) {
+    final cid = CID.parse(proofCid);
+    _ipldBuilder.addProofCID(cid);
   }
 
-  /// Build the invocation (without signing)
-  UcanInvocation build({
-    int? expiration,
-    String? nonce,
-  }) {
-    if (_capabilities.isEmpty) {
-      throw StateError('At least one capability must be added');
-    }
-
-    return UcanInvocation(
-      issuer: signer.did().did(),
-      audience: audience,
-      capabilities: List.unmodifiable(_capabilities),
-      proofs: List.unmodifiable(_proofs),
-      expiration: expiration,
-      nonce: nonce,
-    );
+  /// Add a proof archive (CAR bytes from delegation)
+  void addProofArchive(Uint8List archive) {
+    _ipldBuilder.addProofArchive(archive);
   }
 
-  /// Sign the invocation and return JWT
-  ///
-  /// Returns a JWT in the format: `header.payload.signature`
-  /// - Header: `{"alg": "EdDSA", "typ": "JWT"}`
-  /// - Payload: UCAN invocation JSON
-  /// - Signature: Ed25519 signature of `header.payload`
-  Future<String> sign({
+  /// Get all proof archives
+  List<Uint8List> get proofArchives => _ipldBuilder.proofArchives;
+
+  /// Build and sign the invocation
+  /// 
+  /// Returns an IPLDInvocation (not a JWT string)
+  Future<IPLDInvocation> build({
     int? expiration,
     String? nonce,
   }) async {
-    final invocation = build(
+    return _ipldBuilder.build(
+      expiration: expiration,
+      nonce: nonce,
+    );
+  }
+
+  /// Build a complete UCANTO message with this invocation
+  /// 
+  /// This creates the ucanto/message@7.0.0 structure with all proof blocks
+  Future<UCNTOMessage> buildMessage({
+    int? expiration,
+    String? nonce,
+  }) async {
+    final invocation = await build(
       expiration: expiration,
       nonce: nonce,
     );
 
-    // Step 1: Create JWT header
-    final header = {'alg': 'EdDSA', 'typ': 'JWT'};
-    final headerEncoded = Base64Url.encodeString(json.encode(header));
+    final message = UCNTOMessage(invocations: [invocation]);
+    
+    // Add proof archives to the message
+    for (final archive in _ipldBuilder.proofArchives) {
+      message.addProofArchive(archive);
+    }
 
-    // Step 2: Create JWT payload (UCAN invocation)
-    final payload = invocation.toJson();
-    final payloadEncoded = Base64Url.encodeString(json.encode(payload));
-
-    // Step 3: Sign the JWT
-    final toSign = '$headerEncoded.$payloadEncoded';
-    final signature = await signer.sign(utf8.encode(toSign));
-    final signatureEncoded = Base64Url.encode(signature);
-
-    // Step 4: Return complete JWT
-    return '$toSign.$signatureEncoded';
+    return message;
   }
 }
 
