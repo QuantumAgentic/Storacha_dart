@@ -52,6 +52,9 @@ dependencies:
   
   # Meta annotations (@immutable, etc.)
   meta: ^1.11.0
+  
+  # CBOR encoding for IPNS records
+  cbor: ^6.2.0
 
 dev_dependencies:
   flutter_test:
