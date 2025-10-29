@@ -1,0 +1,67 @@
+name: Build JS Bundle
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tool/js_web/**'
+      - '.github/workflows/build_js_bundle.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tool/js_web/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: tool/js_web/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd tool/js_web
+          npm ci
+      
+      - name: Build JS bundle
+        run: |
+          cd tool/js_web
+          npm run build
+      
+      - name: Verify bundle exists
+        run: |
+          if [ ! -f assets/js/uploader.bundle.js ]; then
+            echo "❌ Bundle not found!"
+            exit 1
+          fi
+          echo "✅ Bundle created: $(du -h assets/js/uploader.bundle.js | cut -f1)"
+      
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-bundle
+          path: |
+            assets/js/uploader.bundle.js
+            assets/js/uploader.bundle.meta.json
+          retention-days: 30
+      
+      - name: Check bundle size
+        run: |
+          SIZE=$(stat -f%z assets/js/uploader.bundle.js 2>/dev/null || stat -c%s assets/js/uploader.bundle.js)
+          SIZE_KB=$((SIZE / 1024))
+          echo "Bundle size: ${SIZE_KB} KB"
+          
+          # Warn if bundle is too large (>500KB)
+          if [ $SIZE_KB -gt 500 ]; then
+            echo "⚠️  Warning: Bundle size exceeds 500KB"
+          fi
+

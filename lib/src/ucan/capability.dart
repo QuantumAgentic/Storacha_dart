@@ -60,6 +60,9 @@ class Capability {
   final Map<String, dynamic>? nb;
 
   /// Convert to JSON
+  ///
+  /// IMPORTANT: This preserves CID objects in nb for proper DAG-CBOR encoding.
+  /// CIDs will be encoded with CBOR tag 42 by the DAG-CBOR encoder.
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'with': with_,
@@ -67,6 +70,8 @@ class Capability {
     };
 
     if (nb != null && nb!.isNotEmpty) {
+      // Preserve CID objects - don't call toJson() on them
+      // The DAG-CBOR encoder will handle them correctly
       json['nb'] = nb;
     }
 
@@ -107,4 +112,20 @@ class Capability {
     final nbPart = nb != null ? ', nb: $nb' : '';
     return 'Capability(with: $with_, can: $can$nbPart)';
   }
+}
+
+/// Helper to build a ucan/conclude invocation payload equivalent
+Capability buildConcludeCapability({
+  required String withDid,
+  required Map<String, dynamic> receiptCbor,
+}) {
+  // Encode receipt DAG-CBOR like JS does: attach receipt as root in facts
+  // We place a placeholder here since our transport leverages IPLDInvocationBuilder
+  return Capability(
+    with_: withDid,
+    can: 'ucan/conclude',
+    nb: {
+      'receipt': receiptCbor,
+    },
+  );
 }

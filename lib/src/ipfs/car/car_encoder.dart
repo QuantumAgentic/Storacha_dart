@@ -24,7 +24,24 @@ Uint8List encodeCar({
   required List<CID> roots,
   required List<CARBlock> blocks,
 }) {
+  final result = encodeCarWithPositions(roots: roots, blocks: blocks);
+  return result.bytes;
+}
+
+/// Encodes IPLD blocks into a CAR file and returns both the bytes and block positions.
+///
+/// This is useful for creating ShardedDAGIndex, which needs to know the exact
+/// position of each block within the CAR file.
+///
+/// Returns [EncodedCAR] containing:
+/// - bytes: The complete CAR file
+/// - blockPositions: Map of CID → (offset, length) for each block
+EncodedCAR encodeCarWithPositions({
+  required List<CID> roots,
+  required List<CARBlock> blocks,
+}) {
   final builder = BytesBuilder();
+  final blockPositions = <CID, (int, int)>{};
 
   // Encode header
   final header = CARHeader(version: CARVersion.v1, roots: roots);
@@ -35,13 +52,36 @@ Uint8List encodeCar({
     ..add(headerLength)
     ..add(headerBytes);
 
-  // Encode blocks
+  var currentOffset = headerLength.length + headerBytes.length;
+
+  // Encode blocks and track their positions
   for (final block in blocks) {
-    final blockBytes = _encodeCarBlock(block);
-    builder.add(blockBytes);
+    final cidBytes = block.cid.bytes;
+    final dataBytes = block.bytes;
+    final blockLength = cidBytes.length + dataBytes.length;
+    final lengthVarint = varint.encode(blockLength);
+
+    // Calculate position: [offset_to_data_start, data_length]
+    // This matches the JS client's ShardingStream behavior
+    final blockHeaderLength = lengthVarint.length + cidBytes.length;
+    final dataOffset = currentOffset + blockHeaderLength;
+    
+    // Store position: offset points to the start of the DATA (not varint)
+    // and length is just the data length (not including varint+CID)
+    blockPositions[block.cid] = (dataOffset, dataBytes.length);
+
+    builder
+      ..add(lengthVarint)
+      ..add(cidBytes)
+      ..add(dataBytes);
+
+    currentOffset += lengthVarint.length + blockLength;
   }
 
-  return builder.toBytes();
+  return EncodedCAR(
+    bytes: builder.toBytes(),
+    blockPositions: blockPositions,
+  );
 }
 
 /// Encodes a CAR header to CBOR format.
@@ -101,22 +141,6 @@ Uint8List _encodeCarHeader(CARHeader header) {
 
     return builder.toBytes();
   }
-
-/// Encodes a single CAR block.
-Uint8List _encodeCarBlock(CARBlock block) {
-  final cidBytes = block.cid.bytes;
-  final dataBytes = block.bytes;
-
-  // Block = CID bytes + data bytes
-  final blockLength = cidBytes.length + dataBytes.length;
-  final lengthVarint = varint.encode(blockLength);
-
-  return (BytesBuilder()
-        ..add(lengthVarint)
-        ..add(cidBytes)
-        ..add(dataBytes))
-      .toBytes();
-}
 
 /// Calculates the size of a CAR file without encoding it.
 int calculateCarSize({

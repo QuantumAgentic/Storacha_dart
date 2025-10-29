@@ -1,17 +1,22 @@
 /// Main Storacha client for interacting with the Storacha Network
 library;
 
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:storacha_dart/src/client/client_config.dart';
 import 'package:storacha_dart/src/client/space.dart';
 import 'package:storacha_dart/src/crypto/signer.dart';
 import 'package:storacha_dart/src/ipfs/car/car_encoder.dart';
 import 'package:storacha_dart/src/ipfs/car/car_types.dart';
+import 'package:storacha_dart/src/ipfs/car/sharded_dag_index.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/cid.dart';
 import 'package:storacha_dart/src/ipfs/multiformats/multihash.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_encoder.dart';
+import 'package:storacha_dart/src/filecoin/piece_hasher.dart';
 import 'package:storacha_dart/src/ipfs/unixfs/unixfs_types.dart';
 import 'package:storacha_dart/src/transport/storacha_transport.dart';
 import 'package:storacha_dart/src/ucan/capability.dart';
@@ -222,6 +227,7 @@ class StorachaClient {
     }
 
     // Step 1: Encode file to UnixFS DAG
+    // NOTE: UnixFS encoder now always creates DAG-PB structure for Storacha compatibility
     final unixfsEncoder = UnixFSEncoder(
       options: UnixFSEncodeOptions(
         chunkSize: options?.chunkSize ?? 256 * 1024,
@@ -229,6 +235,11 @@ class StorachaClient {
     );
 
     final unixfsResult = await unixfsEncoder.encodeFile(file);
+    
+    print('🔹 UnixFS blocks: ${unixfsResult.blocks.length}');
+    for (var i = 0; i < unixfsResult.blocks.length; i++) {
+      print('  Block $i: CID=${unixfsResult.blocks[i].cid}, size=${unixfsResult.blocks[i].bytes.length}');
+    }
 
     // Step 2: Convert IPLD blocks to CAR blocks
     final carBlocks = unixfsResult.blocks
@@ -240,17 +251,60 @@ class StorachaClient {
         )
         .toList();
 
-    // Step 3: Generate CAR file
-    final carBytes = encodeCar(
+    // Step 3: Generate CAR file with block positions (for index creation)
+    // Storacha uses standard CAR format, not indexed CAR
+    final encodedCar = encodeCarWithPositions(
       roots: [unixfsResult.rootCID],
       blocks: carBlocks,
     );
+    final carBytes = encodedCar.bytes;
+
+    print('🔹 CAR created: ${carBytes.length} bytes (${encodedCar.blockPositions.length} blocks)');
+
+    // DEBUG: Save blob CAR to file for inspection
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final carPath = '/tmp/blob_car_$timestamp.car';
+      await File(carPath).writeAsBytes(carBytes);
+      print('DEBUG: Saved blob CAR to $carPath');
+    } catch (_) {}
+
+    // TEMPORARY: If backend URL is configured, use it for upload
+    // This workaround uses a backend proxy to ensure immediate IPFS retrieval.
+    // Will be removed once the native Dart flow properly handles all Storacha receipts.
+    if (_config.backendUrl != null) {
+      print('🔹 Using backend upload: ${_config.backendUrl}');
+      return await _uploadViaBackend(carBytes, unixfsResult.rootCID);
+    }
+
+    // Step 3.5: Calculate piece CID for filecoin/offer
+    // This is CRITICAL for making content retrievable via IPFS gateways
+    print('🔹 Calculating Filecoin piece CID...');
+    final pieceCid = await _calculatePieceCid(carBytes);
+    print('🔹 Piece CID: $pieceCid');
 
     // Step 4: Calculate CAR digest for blob descriptor
     final carMultihash = sha256Hash(carBytes);
-    final carDigest = carMultihash.digest;
+    // IMPORTANT: pass full multihash (code+size+digest), not just digest
+    final carDigest = carMultihash.bytes;
 
-    // Step 5: Request blob allocation (space/blob/add capability)
+    // Helper: builder factory like JS configure()
+    InvocationBuilder _builderForCaps(List<String> caps) {
+      final b = InvocationBuilder(signer: _config.principal);
+      // Add delegation proofs for any of the requested caps, same audience
+      final audienceDid = _config.principal.did().did();
+      final proofs = _delegationStore.valid
+          .where((d) => caps.any((c) => d.grantsCapability(c, resource: _currentSpace!.did)))
+          .where((d) => d.audience == audienceDid);
+      for (final d in proofs) {
+        if (d.archive != null) {
+          b.addProofArchive(d.archive!);
+        }
+      }
+      return b;
+    }
+
+    // Step 5: Request blob allocation (space/blob/add capability) for DATA CAR
     final blobDescriptor = BlobDescriptor(
       digest: carDigest,
       size: carBytes.length,
@@ -267,18 +321,8 @@ class StorachaClient {
       },
     );
 
-    final blobBuilder = InvocationBuilder(signer: _config.principal)
+    final blobBuilder = _builderForCaps(['space/blob/add'])
       ..addCapability(blobCapability);
-
-    // Add delegation proofs if available
-    final blobDelegations = _delegationStore.valid
-        .where((d) => d.grantsCapability('space/blob/add', resource: _currentSpace!.did))
-        .where((d) => d.audience == _config.principal.did().did());
-    for (final delegation in blobDelegations) {
-      if (delegation.archive != null) {
-        blobBuilder.addProofArchive(delegation.archive!);
-      }
-    }
 
     final allocation = await _transport.invokeBlobAdd(
       spaceDid: _currentSpace!.did,
@@ -300,6 +344,25 @@ class StorachaClient {
               }
             : null,
       );
+      // Ensure conclude for http/put like JS client does
+      await _transport.concludeHttpPutIfNeeded(
+        allocation.httpPutTaskCid,
+        allocation.httpPutTaskFacts,
+      );
+      // JS parity: Poll for blob/accept to ensure the blob is fully accepted
+      // NOTE: This is optional and may timeout for large blobs
+      if (allocation.acceptTaskCid != null) {
+        try {
+          print('DEBUG: Polling for blob/accept task ${allocation.acceptTaskCid}');
+          // Poll with short timeout (5s) - non-critical
+          final acceptCid = CID.parse(allocation.acceptTaskCid!);
+          await _transport.pollTaskReceipt(acceptCid, timeout: const Duration(seconds: 5));
+          print('DEBUG: blob/accept confirmed');
+        } catch (e) {
+          print('DEBUG: blob/accept poll timeout/failed (non-fatal, continuing): $e');
+          // Non-fatal: the blob is uploaded, accept happens asynchronously
+        }
+      }
     } else {
       // Blob already exists, just notify 100% progress
       if (options?.onUploadProgress != null) {
@@ -309,7 +372,94 @@ class StorachaClient {
       }
     }
 
-    // Step 7: Register upload (upload/add capability)
+    // Step 7: Create and upload ShardedDAGIndex
+    // The index maps slices (blocks) to their positions in the CAR shard
+    print('🔹 Creating ShardedDAGIndex...');
+    final index = createShardedDAGIndex(unixfsResult.rootCID);
+    
+    // Add each block's position in the CAR
+    for (final entry in encodedCar.blockPositions.entries) {
+      final blockCid = entry.key;
+      final position = entry.value;
+      index.setSlice(carMultihash, blockCid.multihash, position);
+      print('  📍 Block ${blockCid.toString().substring(0, 20)}... at [${position.$1}, ${position.$2}]');
+    }
+    
+    // Also add the CAR shard itself as a slice (position 0, full length)
+    // This is what the JS client does
+    index.setSlice(carMultihash, carMultihash, (0, carBytes.length));
+    print('  📍 CAR itself at [0, ${carBytes.length}]');
+    
+    final indexBytes = await index.archive();
+    print('🔹 Index CAR created: ${indexBytes.length} bytes');
+    
+    // Upload the index as a separate blob (like JS uploadBlocks)
+    final indexMultihash = sha256Hash(indexBytes);
+    final indexBlobDescriptor = BlobDescriptor(
+      digest: indexMultihash.bytes,
+      size: indexBytes.length,
+    );
+    
+    final indexBlobCapability = Capability(
+      with_: _currentSpace!.did,
+      can: 'space/blob/add',
+      nb: {
+        'blob': {
+          'digest': indexMultihash.bytes,
+          'size': indexBytes.length,
+        },
+      },
+    );
+    
+    final indexBlobBuilder = _builderForCaps(['space/blob/add'])
+      ..addCapability(indexBlobCapability);
+    
+    final indexAllocation = await _transport.invokeBlobAdd(
+      spaceDid: _currentSpace!.did,
+      blob: indexBlobDescriptor,
+      builder: indexBlobBuilder,
+    );
+    
+    // Upload index CAR if newly allocated
+    if (indexAllocation.allocated && indexAllocation.url != null) {
+      await _transport.uploadBlob(
+        url: indexAllocation.url!,
+        data: indexBytes,
+        headers: indexAllocation.headers ?? {},
+      );
+      print('🔹 Index uploaded successfully');
+      await _transport.concludeHttpPutIfNeeded(
+        indexAllocation.httpPutTaskCid,
+        indexAllocation.httpPutTaskFacts,
+      );
+      // JS parity: Poll for blob/accept for the index as well (non-fatal)
+      if (indexAllocation.acceptTaskCid != null) {
+        try {
+          print('DEBUG: Polling for index blob/accept task ${indexAllocation.acceptTaskCid}');
+          final acceptCid = CID.parse(indexAllocation.acceptTaskCid!);
+          await _transport.pollTaskReceipt(acceptCid, timeout: const Duration(seconds: 5));
+          print('DEBUG: index blob/accept confirmed');
+        } catch (e) {
+          print('DEBUG: index blob/accept poll timeout/failed (non-fatal): $e');
+        }
+      }
+    }
+    
+    // Create index CID
+    final indexCid = CID.createV1(carCode, indexMultihash);
+    
+    // Register the index with space/index/add
+    final indexAddCapability = Capability(
+      with_: _currentSpace!.did,
+      can: 'space/index/add',
+      nb: {
+        'index': indexCid, // CID object for DAG-CBOR encoding
+      },
+    );
+    final indexAddBuilder = _builderForCaps(['space/index/add'])
+      ..addCapability(indexAddCapability);
+
+    // Step 8: Register upload (upload/add capability)
     // Create CID for the CAR file (codec 0x202)
     final carCid = CID.createV1(carCode, carMultihash);
 
@@ -322,18 +472,8 @@ class StorachaClient {
       },
     );
 
-    final uploadBuilder = InvocationBuilder(signer: _config.principal)
+    final uploadBuilder = _builderForCaps(['upload/add'])
       ..addCapability(uploadCapability);
-
-    // Add delegation proofs if available
-    final uploadDelegations = _delegationStore.valid
-        .where((d) => d.grantsCapability('upload/add', resource: _currentSpace!.did))
-        .where((d) => d.audience == _config.principal.did().did());
-    for (final delegation in uploadDelegations) {
-      if (delegation.archive != null) {
-        uploadBuilder.addProofArchive(delegation.archive!);
-      }
-    }
 
     // Retry logic for TransactionConflict errors (Storacha race conditions)
     int retries = 0;
@@ -342,24 +482,29 @@ class StorachaClient {
     
     while (true) {
       try {
+        // CRITICAL: JS client does these SEQUENTIALLY, not in parallel!
+        // 1. Register index
+        await _transport.invokeCapability(builder: indexAddBuilder);
+        print('🔹 Index registered with space/index/add');
+        
+        // 2. Register upload (AFTER index is registered)
         final uploadResult = await _transport.invokeUploadAdd(
           spaceDid: _currentSpace!.did,
           root: unixfsResult.rootCID,
           shards: [carCid],
           builder: uploadBuilder,
         );
-
+        print('🔹 Upload registered with upload/add');
+        
         return uploadResult.root;
       } catch (e) {
-        // Check if it's a TransactionConflict and we can retry
-        if (retries < maxRetries && 
-            e.toString().contains('TransactionConflict')) {
+        if (retries < maxRetries && e.toString().contains('TransactionConflict')) {
           retries++;
           print('⚠️  Storacha TransactionConflict, retry $retries/$maxRetries...');
-          await Future.delayed(retryDelay * retries); // Exponential backoff
+          await Future<void>.delayed(retryDelay * retries);
           continue;
         }
-        rethrow; // Other errors or max retries reached
+        rethrow;
       }
     }
   }
@@ -425,9 +570,80 @@ class StorachaClient {
     );
   }
 
+  /// TEMPORARY: Upload CAR via backend Vercel function
+  ///
+  /// This method sends the CAR bytes to the backend which uses the
+  /// official JS client for upload. This ensures immediate IPFS retrieval.
+  ///
+  /// This is a temporary workaround and will be removed once the native
+  /// Dart flow properly handles all Storacha receipts and integrations.
+  Future<CID> _uploadViaBackend(Uint8List carBytes, CID rootCID) async {
+    try {
+      // Get delegation for current space
+      final delegation = _delegationStore.valid.firstWhere(
+        (d) => d.grantsCapability('space/blob/add', resource: _currentSpace!.did),
+        orElse: () => throw StateError('No valid delegation found for current space'),
+      );
+
+      if (delegation.archive == null) {
+        throw StateError('Delegation missing archive (CAR bytes)');
+      }
+
+      // Encode to base64
+      final carBase64 = base64Encode(carBytes);
+      final delegationBase64 = base64Encode(delegation.archive!);
+
+      print('🔹 Sending ${carBytes.length} bytes to backend...');
+
+      // POST to backend
+      final response = await _http.post<Map<String, dynamic>>(
+        '${_config.backendUrl}/api/upload',
+        data: {
+          'carBase64': carBase64,
+          'delegationBase64': delegationBase64,
+        },
+      );
+
+      if (response.data == null) {
+        throw Exception('Backend returned empty response');
+      }
+
+      final result = response.data!;
+
+      if (result['success'] == true) {
+        final cidString = result['cid'] as String;
+        print('✅ Backend upload successful: $cidString');
+
+        // Parse and return the CID
+        return CID.parse(cidString);
+      } else {
+        final error = result['error'] ?? 'Unknown error';
+        throw Exception('Backend upload failed: $error');
+      }
+    } catch (e) {
+      print('❌ Backend upload error: $e');
+      rethrow;
+    }
+  }
+
+  /// Calculate piece CID from CAR bytes
+  ///
+  /// This computes the CommP (piece commitment) using FR32 padding
+  /// and binary tree hashing as specified in FRC-0058.
+  Future<CID> _calculatePieceCid(Uint8List carBytes) async {
+    // Use compute() to run in isolate for better performance on large files
+    return compute(_computePieceCidIsolate, carBytes);
+  }
+
   /// Close the client and release resources
   void close() {
     _http.close();
     _transport.close();
   }
+}
+
+/// Top-level function for compute() isolate
+/// Computes piece CID from CAR bytes
+CID _computePieceCidIsolate(Uint8List carBytes) {
+  return computePieceCid(carBytes);
 }

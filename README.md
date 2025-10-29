@@ -1,122 +1,49 @@
 # storacha_dart
 
-[![pub package](https://img.shields.io/pub/v/storacha_dart.svg)](https://pub.dev/packages/storacha_dart)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A Dart/Flutter client library for [Storacha Network](https://storacha.network) (formerly web3.storage). Upload files to IPFS and Filecoin with ease, manage decentralized storage spaces, and retrieve content via IPFS gateways.
+> ⚠️ **UNOFFICIAL & UNSTABLE VERSION**
+> This is an **unofficial** Dart/Flutter implementation of the Storacha Network client. This package is **not yet stable** and is under active development. APIs may change without notice. Use at your own risk in production environments.
 
-## Features
+A Dart/Flutter client library for [Storacha Network](https://storacha.network) (formerly web3.storage). Upload files to IPFS and Filecoin with ease using UCAN delegations.
 
-- 🔐 **Email-based authentication** - Simple login flow with email verification
-- 📦 **Space management** - Create and manage isolated storage namespaces
-- 📤 **File uploads** - Upload single files or entire directories
+## ✨ Features
+
+- 📦 **Space Management** - Create and manage isolated storage namespaces
+- 📤 **File Uploads** - Upload files to IPFS/Filecoin via Storacha Network
+- 🔑 **UCAN Delegation Support** - Work with delegations from Storacha CLI
 - 🌐 **Multi-platform** - iOS, Android, Web, Windows, macOS, Linux
-- 📱 **Mobile-optimized** - Efficient memory usage, battery-aware, background uploads
-- 🔑 **Injectable signers** - Bring your own key management (IPNS, HSM, Secure Enclave)
-- 🔒 **Secure key storage** - Encrypted local storage for credentials
 - 🎯 **Type-safe** - Full Dart type safety with null safety
-- 🧪 **Well tested** - >80% code coverage
+- 📱 **Mobile-optimized** - Efficient memory usage and chunked uploads
 
-## 🎉 Storacha Network Support
+## 🚨 Current Limitations
 
-### ✅ Current Status (v0.1.0+)
+This package is **not yet production-ready**. Known limitations:
 
-This package now includes **UCAN delegation support** and is **production-ready** for:
-- ✅ Local IPFS nodes
-- ✅ Custom storage providers
-- ✅ Development and testing
-- ✅ Content-addressable encoding
-- ✅ **UCAN delegation loading** - Load delegations from Storacha CLI
-- ✅ **Delegated uploads** - Upload to production Storacha network with delegations
+- **No email-based authentication** - You must use UCAN delegations from Storacha CLI
+- **Temporary backend workaround** - Uses an optional backend proxy for reliable uploads (see Configuration section)
+- **No directory uploads** - Only single file uploads are currently supported
+- **Limited error handling** - Some edge cases may not be properly handled
+- **Receipt handling incomplete** - Some Storacha receipts may not parse correctly
 
-### 🔜 Coming Soon
+## 📋 Prerequisites
 
-Additional features in development:
-- 📡 **Space delegation API** - Programmatic space delegation without CLI (currently requires Storacha CLI)
+To use this package with the production Storacha Network, you need:
 
-### 💡 Using Delegations
-
-Upload files to Storacha using delegations created by the Storacha CLI. Delegations allow you to grant specific permissions (like `space/blob/add` and `upload/add`) to an agent without sharing your account credentials.
-
-#### Quick Start with Delegations
-
-1. **Install Storacha CLI**: 
+1. **Storacha CLI** installed and configured:
    ```bash
    npm install -g @storacha/cli
+   storacha login your@email.com
    ```
 
-2. **Login and create a space**:
+2. **A Storacha space** created via the CLI:
    ```bash
-   storacha login your@email.com
    storacha space create my-app-space
    ```
 
-3. **Get your agent DID** (from your Dart app):
-   ```dart
-   final agent = await Ed25519Signer.generate();
-   print('Agent DID: ${agent.did().did()}');
-   // Example output: did:key:z6MkqTtiRFtW67NtYNgGD5mGWCh3UJbYwLDNmXbQFjz4zqrz
-   ```
+3. **UCAN delegations** created for your app's agent DID (see Usage section)
 
-4. **Create delegation** (choose one format):
-
-   **Option A: Binary CAR format** (recommended):
-   ```bash
-   storacha delegation create <AGENT_DID> \
-     --can 'space/blob/add' \
-     --can 'upload/add' \
-     --can 'space/index/add' \
-     --output delegation.car
-   ```
-
-   **Option B: Base64 identity CID format**:
-   ```bash
-   storacha delegation create <AGENT_DID> \
-     --can 'space/blob/add' \
-     --can 'upload/add' \
-     --can 'space/index/add' \
-     --base64 > delegation.txt
-   ```
-
-5. **Use in your app**:
-   ```dart
-   // Load delegation (automatically detects format)
-   final delegation = await Delegation.fromFile('delegation.car');
-   
-   // Use it with your client
-   final config = StorachaConfig(
-     principal: agent,
-     delegations: [delegation],
-   );
-   final client = StorachaClient(config: config);
-   ```
-
-#### Supported Delegation Formats
-
-The package automatically detects and parses both formats:
-
-- **Binary CAR** (`.car`): IPLD CAR file containing the full UCAN proof chain
-- **Base64 Identity CID** (`.txt`): Base64-encoded identity CID (multibase format)
-
-Both formats work identically - use whichever is more convenient for your workflow.
-
-#### Required Capabilities
-
-For uploading files, you need these capabilities:
-- `space/blob/add` - Add raw blobs to the space
-- `upload/add` - Register DAG structures
-- `space/index/add` - Index uploaded content (optional but recommended)
-
-### 📚 New to Storacha? Start Here!
-
-**Confused about delegations?** Read this first:
-
-- 🎯 **[STORACHA_GUIDE.md](../STORACHA_GUIDE.md)** - Quick answer to your questions (5 min)
-- 🚀 **[CLI Quick Start](docs/QUICKSTART_CLI.md)** - Upload files now (30 min)
-
-**In French 🇫🇷** (English coming soon)
-
-## Installation
+## 📦 Installation
 
 Add to your `pubspec.yaml`:
 
@@ -131,362 +58,249 @@ Then run:
 flutter pub get
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Create a client
+### 1. Generate an Agent DID
 
-```dart
-import 'package:storacha_dart/storacha_dart.dart';
-
-final client = await StorachaClient.create();
-```
-
-### 2. Login with email
-
-```dart
-final account = await client.login('your-email@example.com');
-
-// Wait for payment plan selection (required for new accounts)
-await account.plan.wait();
-```
-
-### 3. Create a space
-
-```dart
-final space = await client.createSpace(
-  'my-awesome-space',
-  account: account,
-);
-```
-
-### 4. Upload files
-
-```dart
-// Upload a single file
-final bytes = await File('document.pdf').readAsBytes();
-final cid = await client.uploadFile(
-  bytes,
-  filename: 'document.pdf',
-);
-
-print('File uploaded! CID: $cid');
-print('Gateway URL: ${client.getGatewayUrl(cid)}');
-
-// Upload a directory
-final files = [
-  StorachaFile(
-    content: readmeBytes,
-    path: 'readme.md',
-  ),
-  StorachaFile(
-    content: mainPyBytes,
-    path: 'src/main.py',
-  ),
-  StorachaFile(
-    content: imageBytes,
-    path: 'images/logo.png',
-  ),
-];
-
-final dirCid = await client.uploadDirectory(files);
-print('Directory uploaded! CID: $dirCid');
-```
-
-## Usage Examples
-
-### Upload with delegations (Storacha CLI)
-
-Use delegations created by Storacha CLI to upload to spaces you don't own. Supports both JWT and CAR formats:
+Your app needs a unique identifier (DID) to receive delegations:
 
 ```dart
 import 'package:storacha_dart/storacha_dart.dart';
 
-// 1. Load delegation from file (created by Storacha CLI)
-final delegation = await Delegation.fromFile('delegation.ucan');
-
-// 2. Create client with delegation
+// Generate a new agent (save this for later use!)
 final agent = await Ed25519Signer.generate();
+print('Agent DID: ${agent.did().did()}');
+// Example output: did:key:z6MkqTtiRFtW67NtYNgGD5mGWCh3UJbYwLDNmXbQFjz4zqrz
+```
+
+**Important:** Save the agent's private key securely. You'll need it each time your app runs.
+
+### 2. Create a Delegation
+
+Use the Storacha CLI to delegate permissions to your agent:
+
+```bash
+# Create delegation with required capabilities
+storacha delegation create <YOUR_AGENT_DID> \
+  --can 'space/blob/add' \
+  --can 'upload/add' \
+  --can 'space/index/add' \
+  --output delegation.car
+```
+
+This creates a `delegation.car` file that grants your agent permission to upload to your space.
+
+### 3. Upload Files
+
+Load the delegation and upload files:
+
+```dart
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:storacha_dart/storacha_dart.dart';
+
+// Load the delegation
+final delegation = await Delegation.fromFile('delegation.car');
+
+// Create client configuration
+final agent = await Ed25519Signer.generate(); // Or load your saved agent
 final config = ClientConfig(
   principal: agent,
   defaultProvider: 'did:web:up.storacha.network',
 );
 
-final client = StorachaClient(
-  config,
-  delegations: [delegation],
-);
+// Initialize client with delegation
+final client = StorachaClient(config, delegations: [delegation]);
 
-// 3. Add the delegated space
-final spaceDid = delegation.capabilities.first.with_; // Extract space DID
+// Extract space DID from delegation
+final spaceDid = delegation.capabilities.first.with_;
+
+// Add and select the space
 final space = Space(
   did: spaceDid,
-  name: 'Delegated Space',
+  name: 'My Space',
   signer: agent,
   createdAt: DateTime.now(),
 );
-
 client.addSpace(space);
 client.setCurrentSpace(spaceDid);
 
-// 4. Upload files (proofs automatically included)
-final cid = await client.uploadFile(
-  MemoryFile(name: 'photo.jpg', bytes: photoBytes),
+// Upload a file
+final file = MemoryFile(
+  name: 'hello.txt',
+  bytes: Uint8List.fromList('Hello, Storacha!'.codeUnits),
 );
 
+final cid = await client.uploadFile(file);
 print('Uploaded! CID: $cid');
+print('View at: https://w3s.link/ipfs/$cid');
+
+// Clean up
+client.close();
 ```
 
-**Creating delegations with Storacha CLI:**
+## 📖 Core Concepts
 
+### Spaces
+
+A **space** is an isolated storage namespace in Storacha. Each space has:
+- A unique DID (Decentralized Identifier)
+- Its own storage quota
+- Independent access control via UCAN delegations
+
+Create a space via the Storacha CLI:
 ```bash
-# Install CLI
-npm install -g @storacha/cli
-
-# Login and create space
-storacha login your@email.com
-storacha space create my-app
-
-# Get your agent DID (from your Dart app)
-# Then create delegation with the exact capabilities you need
-storacha delegation create did:key:z6Mk... \
-  -c space/blob/add \
-  -c space/index/add \
-  -c upload/add \
-  --base64 > delegation.txt
+storacha space create my-app-space
 ```
 
-The `--base64` flag outputs the delegation in a base64-encoded CAR format that includes the full proof chain. The package automatically handles this format when loading from file.
+### UCAN Delegations
 
-See `storacha_test_app/bin/upload_with_delegation.dart` for a complete working example.
+**UCAN (User Controlled Authorization Network)** is a decentralized authorization system. Instead of sharing your credentials, you create **delegations** that grant specific permissions to other DIDs.
 
-### Upload with progress tracking
+Required capabilities for uploads:
+- `space/blob/add` - Upload raw data blobs
+- `upload/add` - Register uploaded content
+- `space/index/add` - Create searchable indexes
+
+### Content Addressing (CID)
+
+Files are identified by their **CID (Content Identifier)**:
+- CIDs are derived from file content using cryptographic hashing
+- Same content always produces the same CID
+- CIDs are universally unique and verifiable
+
+Access uploaded files via IPFS gateways:
+```
+https://w3s.link/ipfs/<CID>
+https://ipfs.io/ipfs/<CID>
+```
+
+## ⚙️ Configuration
+
+### Basic Configuration
 
 ```dart
-final cid = await client.uploadFile(
-  largeFileBytes,
-  filename: 'video.mp4',
-  onProgress: (sent, total) {
-    final percent = (sent / total * 100).toStringAsFixed(1);
-    print('Upload progress: $percent%');
+final config = ClientConfig(
+  principal: agent,                                 // Your agent's signer
+  defaultProvider: 'did:web:up.storacha.network',   // Storacha service DID
+);
+```
+
+### Backend Workaround (TEMPORARY)
+
+> ⚠️ **Temporary Solution**: This workaround ensures immediate IPFS retrieval while native receipt handling is being finalized.
+
+If you experience issues with IPFS retrieval after upload, you can use a backend proxy:
+
+```dart
+final config = ClientConfig(
+  principal: agent,
+  defaultProvider: 'did:web:up.storacha.network',
+  backendUrl: 'https://your-backend.vercel.app',  // Optional backend proxy
+);
+```
+
+The backend acts as a bridge to the official JavaScript client. This workaround will be removed in future versions once the native Dart flow is fully stable.
+
+### Upload Options
+
+```dart
+final options = UploadFileOptions(
+  chunkSize: 256 * 1024,  // 256 KiB chunks (default)
+  onUploadProgress: (status) {
+    print('Progress: ${status.percentage?.toStringAsFixed(1)}%');
   },
 );
+
+final cid = await client.uploadFile(file, options: options);
 ```
 
-### Manage multiple spaces
+## 📝 Examples
 
-```dart
-// Create multiple spaces
-final personalSpace = await client.createSpace('personal');
-final workSpace = await client.createSpace('work');
+See the `example/` directory for complete examples:
 
-// Switch between spaces
-await client.setCurrentSpace(personalSpace.did);
-// ... upload to personal space
+- **[delegation_example.dart](example/delegation_example.dart)** - UCAN delegation workflow
+- **[upload_example.dart](example/upload_example.dart)** - File upload examples
 
-await client.setCurrentSpace(workSpace.did);
-// ... upload to work space
-
-// List all spaces
-final spaces = await client.listSpaces();
-for (final space in spaces) {
-  print('Space: ${space.name} (${space.did})');
-}
+Run examples:
+```bash
+dart run example/delegation_example.dart
+dart run example/upload_example.dart
 ```
 
-### 🔑 Use external signers (IPNS keys, HSM, Secure Enclave)
+## 🏗️ Architecture
 
-One of the key features of `storacha_dart` is the ability to inject your own key management system, keeping private keys secure within your app:
+The package is organized into modules:
 
-```dart
-// Example: Use your existing IPNS keys with Storacha
-class MyIPNSSigner implements Signer {
-  final String _did;
-  final MyKeyManager _keyManager; // Your app's key manager
-  
-  MyIPNSSigner(this._did, this._keyManager);
-  
-  @override
-  String get did => _did;
-  
-  @override
-  Future<Uint8List> sign(Uint8List message) async {
-    // Private key never leaves your key manager
-    return await _keyManager.signWithIPNSKey(message);
-  }
-}
-
-// Option 1: Use custom signer for the entire client
-final ipnsSigner = MyIPNSSigner(myDID, myKeyManager);
-final client = await StorachaClient.create(
-  config: ClientConfig(
-    signer: ipnsSigner, // All operations use your IPNS keys
-  ),
-);
-
-// Option 2: Use different signers for different spaces
-final personalSpace = await client.createSpace('personal'); // Default signer
-final ipnsSpace = await client.createSpace(
-  'ipns-space',
-  signer: ipnsSigner, // This space uses your IPNS keys
-);
-
-// Uploads automatically use the correct signer
-await client.setCurrentSpace(ipnsSpace.did);
-await client.uploadFile(data); // Signed with your IPNS keys
+```
+lib/src/
+├── client/          # Main client and configuration
+├── crypto/          # Signers and DID generation (Ed25519)
+├── ipfs/            # IPFS data structures (CID, CAR, UnixFS)
+├── ucan/            # UCAN delegation and invocation
+├── transport/       # HTTP communication with Storacha
+├── upload/          # Upload logic and blob handling
+└── filecoin/        # Filecoin piece CID calculation
 ```
 
-**Benefits:**
-- 🔒 **Security**: Private keys never exposed to the package
-- 🔑 **Flexibility**: Use HSM, Secure Enclave, or any custom key storage
-- 🔄 **Reuse**: Integrate with existing IPNS keys, crypto wallets, etc.
+## 🧪 Testing
 
-### Custom gateway configuration
-
-```dart
-final space = await client.createSpace(
-  'my-space',
-  account: account,
-  authorizeGatewayServices: [customGateway],
-);
-
-// Or skip gateway authorization entirely
-final privateSpace = await client.createSpace(
-  'private-space',
-  account: account,
-  skipGatewayAuthorization: true,
-);
-```
-
-### Error handling
-
-```dart
-try {
-  final cid = await client.uploadFile(fileBytes);
-} on StorachaAuthException catch (e) {
-  print('Authentication error: $e');
-} on StorachaNetworkException catch (e) {
-  print('Network error: $e');
-} on StorachaException catch (e) {
-  print('General error: $e');
-}
-```
-
-## Platform Support
-
-| Platform | Support | Notes |
-|----------|---------|-------|
-| Android  | ✅ | API level 21+ |
-| iOS      | ✅ | iOS 12+ |
-| Web      | ✅ | All modern browsers |
-| Windows  | ✅ | Windows 10+ |
-| macOS    | ✅ | macOS 10.14+ |
-| Linux    | ✅ | Ubuntu 18.04+ |
-
-## Architecture
-
-The package is organized into several modules:
-
-- **Client** - Main API interface
-- **Models** - Data structures (Space, Account, CID, etc.)
-- **Services** - Business logic (Auth, Upload, Space management)
-- **Storage** - Secure local storage for keys
-- **Crypto** - DID and UCAN implementation
-- **Transport** - HTTP communication and CAR encoding
-
-## 📱 Mobile Performance
-
-`storacha_dart` is specifically optimized for iOS and Android with:
-
-### Memory Efficiency
-- **Streaming architecture** - Files are processed in chunks (256 KiB), not loaded entirely in memory
-- **Support for large files** - Upload multi-GB files without OutOfMemory errors
-- **Adaptive chunking** - Smaller chunks on low-memory devices
-
-```dart
-// Efficient: streams by chunks
-final blob = FileBlob(file);  // Only metadata in memory
-await client.uploadFile(blob);
-
-// Memory usage stays constant regardless of file size!
-```
-
-### Battery Optimization
-- **Network-aware uploads** - Pause on cellular if preferred, continue on WiFi
-- **Batch operations** - Group multiple small uploads to reduce wake-ups
-- **Background processing** - Continue uploads when app is minimized
-
-```dart
-// Battery-friendly options
-await client.uploadFile(
-  blob,
-  options: UploadFileOptions(
-    preferWiFi: true,           // Pause on cellular
-    pauseOnBatteryLow: true,    // Stop if battery < 20%
-  ),
-);
-```
-
-### Performance
-- **Isolate support** - CPU-intensive operations (hashing, encoding) run in separate threads
-- **Progress throttling** - UI updates limited to 60 FPS for smooth experience
-- **Adaptive retries** - Exponential backoff on network failures
-
-### Platform-Specific Features
-
-**iOS**:
-- Keychain integration for secure key storage
-- Background fetch support for scheduled uploads
-- Low Power Mode detection
-
-**Android**:
-- KeyStore integration for secure key storage
-- WorkManager for reliable background uploads
-- Foreground Service for visible long-running uploads
-
-📖 **See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed optimization guide**
-
-## Security
-
-- **DID (Decentralized Identifiers)** - Keys generated locally using Ed25519
-- **UCAN (User Controlled Authorization Network)** - JWT-based authorization
-- **Secure Storage** - Keys stored in Keychain (iOS) or KeyStore (Android)
-- **Recovery** - Optional account-based recovery for multi-device access
-
-## Testing
-
-Run all tests:
-
+Run tests:
 ```bash
 dart test
 ```
 
-Run with coverage:
-
+Run integration tests (requires valid delegation):
 ```bash
-dart test --coverage=coverage
-dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
+dart test test/integration/
 ```
 
-## Contributing
+## 🛠️ Development Status
 
-Contributions are welcome! Please read our [contributing guide](CONTRIBUTING.md) first.
+| Feature | Status | Notes |
+|---------|--------|-------|
+| UCAN delegations | ✅ Working | CAR and base64 formats supported |
+| Single file upload | ✅ Working | With temporary backend workaround |
+| Space management | ✅ Working | Local space management |
+| Progress tracking | ✅ Working | Chunked upload progress |
+| Directory upload | ⏳ Planned | Not yet implemented |
+| Email authentication | ⏳ Planned | Use Storacha CLI for now |
+| Receipt handling | 🔧 In Progress | Some edge cases remain |
+| IPFS retrieval | 🔧 In Progress | Backend workaround available |
 
-## License
+## 🤝 Contributing
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This is an unofficial package developed by QuantumAgentic. Contributions are welcome!
 
-## Resources
+To contribute:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
 
+Please note that APIs may change significantly as the package stabilizes.
+
+## 📄 License
+
+MIT License with trademark restriction - see [LICENSE](LICENSE) file.
+
+The name "QuantumAgentic" and associated trademarks may not be used to endorse products derived from this software without permission.
+
+## 🔗 Resources
+
+- [Storacha Network](https://storacha.network/)
 - [Storacha Documentation](https://docs.storacha.network/)
-- [Storacha JS Client](https://docs.storacha.network/js-client/)
-- [IPFS Documentation](https://docs.ipfs.tech/)
+- [Storacha CLI](https://www.npmjs.com/package/@storacha/cli)
 - [UCAN Specification](https://github.com/ucan-wg/spec)
+- [IPFS Documentation](https://docs.ipfs.tech/)
 
-## Credits
+## ⚠️ Disclaimer
 
-Based on the official [Storacha JavaScript client](https://github.com/storacha/storacha).
+This is an **unofficial** implementation and is **not affiliated with or endorsed by Storacha Network or Protocol Labs**. This package is provided "as-is" without warranty. Use in production at your own risk.
+
+For official Storacha clients, see:
+- [Official JavaScript Client](https://github.com/storacha/w3up)
 
 ---
 
-Made with ❤️ by the CasterCorp team
-
+Made with ❤️ by the QuantumAgentic team

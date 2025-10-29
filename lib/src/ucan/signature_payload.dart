@@ -121,6 +121,11 @@ String _encodeJsonValue(dynamic value) {
     }
     buffer.write(']');
     return buffer.toString();
+  } else if (value is CID) {
+    // CRITICAL FIX: Encode CID as {"/": "string"} for JSON signature payload
+    // CIDs must NOT call toJson() here as this is for JWT signature, not DAG-CBOR
+    // The actual DAG-CBOR encoding (with tag 42) happens later in the pipeline
+    return '{"/":"${value.toString()}"}';
   } else {
     return json.encode(value);
   }

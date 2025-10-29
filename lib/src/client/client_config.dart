@@ -32,6 +32,7 @@ class ClientConfig {
     required this.principal,
     this.endpoints = StorachaEndpoints.production,
     this.defaultProvider = 'did:web:storacha.network',
+    this.backendUrl,
   });
 
   /// The principal (signer) for this client
@@ -44,4 +45,15 @@ class ClientConfig {
 
   /// Default service provider DID
   final String defaultProvider;
+
+  /// Backend upload service URL (Vercel function)
+  ///
+  /// When provided, uploads will be sent to this backend which uses
+  /// the official JS client. This provides guaranteed immediate IPFS
+  /// gateway retrieval.
+  ///
+  /// Example: 'https://storacha-backend-xxx.vercel.app'
+  ///
+  /// If null, will use direct Dart upload implementation.
+  final String? backendUrl;
 }

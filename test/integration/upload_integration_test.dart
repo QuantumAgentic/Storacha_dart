@@ -27,6 +27,7 @@ class TestableStorachaTransport implements StorachaTransport {
   final List<String> invocations = [];
   BlobDescriptor? lastBlobDescriptor;
   Uint8List? lastUploadedData;
+  final List<Uint8List> allUploadedData = []; // Track all uploads
   UploadDescriptor? lastUploadDescriptor;
 
   @override
@@ -72,6 +73,7 @@ class TestableStorachaTransport implements StorachaTransport {
   }) async {
     invocations.add('uploadBlob');
     lastUploadedData = data;
+    allUploadedData.add(data); // Track all uploads
 
     // Simulate progressive upload
     final chunkSize = data.length ~/ 4;
@@ -96,6 +98,44 @@ class TestableStorachaTransport implements StorachaTransport {
   }
 
   @override
+  String get receiptEndpoint => 'https://test.storacha.network/receipt';
+
+  @override
+  Future<void> concludeHttpPutIfNeeded(
+    String? httpPutTaskCid,
+    List<Map<String, dynamic>>? httpPutTaskFacts,
+  ) async {
+    invocations.add('concludeHttpPutIfNeeded');
+  }
+
+  @override
+  Future<void> invokeConclude({
+    required InvocationBuilder builder,
+  }) async {
+    invocations.add('invokeConclude');
+  }
+
+  @override
+  Future<Map<String, dynamic>?> pollReceipt(
+    CID receiptCid, {
+    Duration timeout = const Duration(seconds: 30),
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async {
+    invocations.add('pollReceipt');
+    return null;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> pollTaskReceipt(
+    CID taskCid, {
+    Duration timeout = const Duration(seconds: 30),
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async {
+    invocations.add('pollTaskReceipt');
+    return null;
+  }
+
+  @override
   void close() {
     invocations.add('close');
   }
@@ -104,6 +144,7 @@ class TestableStorachaTransport implements StorachaTransport {
     invocations.clear();
     lastBlobDescriptor = null;
     lastUploadedData = null;
+    allUploadedData.clear();
     lastUploadDescriptor = null;
   }
 }
@@ -171,11 +212,18 @@ void main() {
         expect(cid, isNotNull);
         expect(cid.code, equals(dagPbCode)); // Chunked files use dag-pb
 
-        // Verify CAR file was created and uploaded
-        expect(transport.lastUploadedData, isNotNull);
+        // Verify blob CAR file (first upload) was created and uploaded
+        expect(transport.allUploadedData, isNotEmpty);
+        expect(transport.allUploadedData.length, greaterThanOrEqualTo(2)); // blob + index
         expect(
-          transport.lastUploadedData!.length,
-          greaterThan(1000), // CAR header + blocks
+          transport.allUploadedData.first.length,
+          greaterThan(1000), // Blob CAR should be large
+        );
+
+        // Verify index CAR (second upload) is smaller
+        expect(
+          transport.allUploadedData[1].length,
+          lessThan(1000), // Index CAR is smaller
         );
       });
 

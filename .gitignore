@@ -77,3 +77,7 @@ test/.test_cache/
 reference_js_client/node_modules/
 reference_js_client/package-lock.json
 
+# Development documentation and reference materials
+docs/dev/
+docs/reference/
+

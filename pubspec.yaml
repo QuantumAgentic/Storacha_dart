@@ -1,9 +1,9 @@
 name: storacha_dart
 description: A Dart client library for Storacha Network (IPFS/Filecoin storage). Upload files, manage spaces, and interact with decentralized storage.
 version: 0.1.0
-homepage: https://github.com/CasterCorp/storacha_dart
-repository: https://github.com/CasterCorp/storacha_dart
-issue_tracker: https://github.com/CasterCorp/storacha_dart/issues
+homepage: https://github.com/QuantumAgentic/storacha_dart
+repository: https://github.com/QuantumAgentic/storacha_dart
+issue_tracker: https://github.com/QuantumAgentic/storacha_dart/issues
 documentation: https://pub.dev/documentation/storacha_dart/latest/
 
 environment:
@@ -55,6 +55,12 @@ dependencies:
   
   # CBOR encoding for IPNS records
   cbor: ^6.2.0
+  
+  # WebView for mobile JS uploader
+  webview_flutter: ^4.4.0
+  
+  # QuickJS runtime (flutter_js) for WebView-less JS execution
+  flutter_js: ^0.8.1
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +83,10 @@ dev_dependencies:
   coverage: ^1.7.2
 
 flutter:
-  # No assets or plugins needed for now
   uses-material-design: false
+  
+  # JS bundle for WebView uploader (mobile)
+  assets:
+    - assets/js/uploader.bundle.js
+    - assets/js/uploader.bundle.meta.json
 

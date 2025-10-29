@@ -57,6 +57,9 @@ class BlobAllocation {
     required this.allocated,
     this.url,
     this.headers,
+    this.acceptTaskCid,
+    this.httpPutTaskCid,
+    this.httpPutTaskFacts,
   });
 
   /// Whether the blob was newly allocated (true) or already exists (false)
@@ -67,6 +70,15 @@ class BlobAllocation {
 
   /// HTTP headers to use for PUT (if allocated)
   final Map<String, String>? headers;
+
+  /// Optional: task CID for blob/accept (to allow polling)
+  final String? acceptTaskCid;
+
+  /// Optional: task CID for http/put (to allow conclude/polling if needed)
+  final String? httpPutTaskCid;
+
+  /// Optional: facts from http/put task (contains derived signer keys)
+  final List<Map<String, dynamic>>? httpPutTaskFacts;
 
   factory BlobAllocation.fromJson(Map<String, dynamic> json) {
     final allocated = json['allocated'] as bool? ?? false;
@@ -80,6 +92,10 @@ class BlobAllocation {
               (key, value) => MapEntry(key.toString(), value.toString()),
             )
           : null,
+      // JSON path does not carry task CIDs; leave null here
+      acceptTaskCid: null,
+      httpPutTaskCid: null,
+      httpPutTaskFacts: null,
     );
   }
 
@@ -92,10 +108,10 @@ class BlobAllocation {
           url == other.url;
 
   @override
-  int get hashCode => Object.hash(allocated, url);
+  int get hashCode => Object.hash(allocated, url, acceptTaskCid, httpPutTaskCid);
 
   @override
-  String toString() => 'BlobAllocation(allocated: $allocated, url: $url)';
+  String toString() => 'BlobAllocation(allocated: $allocated, url: $url, acceptTaskCid: $acceptTaskCid)';
 }
 
 /// Upload descriptor for upload/add capability

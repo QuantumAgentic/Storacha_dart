@@ -27,43 +27,14 @@ class UnixFSEncoder {
 
   /// Encodes a file into a UnixFS DAG.
   ///
-  /// For small files (<= chunkSize), returns a single raw block.
-  /// For larger files, creates a root DAG-PB node with links to raw chunks.
+  /// For small files that fit in a single chunk, returns a single RAW block.
+  /// For larger files, creates a DAG-PB root with links to raw chunks.
+  /// This matches the JS client behavior for Storacha compatibility.
   ///
   /// Returns a [UnixFSEncodeResult] containing the root CID and all blocks.
   Future<UnixFSEncodeResult> encodeFile(BlobLike file) async {
     final fileSize = file.size;
-
-    // If size is known and small, encode as single block
-    if (fileSize != null && fileSize <= options.chunkSize) {
-      return _encodeSingleBlock(file);
-    }
-
-    // If size is unknown or large, use chunked encoding
-    // (chunked encoding will handle single block case if needed)
     return _encodeChunkedFile(file, fileSize);
-  }
-
-  /// Encodes a small file as a single raw block.
-  Future<UnixFSEncodeResult> _encodeSingleBlock(BlobLike file) async {
-    // Read the entire file (it's small)
-    final bytes = await file.stream().fold<BytesBuilder>(
-      BytesBuilder(),
-      (builder, chunk) => builder..add(chunk),
-    );
-    final data = bytes.toBytes();
-
-    // Create CID for the raw data
-    final multihash = sha256Hash(data);
-    final cid = CID.createV1(rawCode, multihash);
-
-    // Single block
-    final block = IPLDBlock(cid: cid, bytes: data);
-
-    return UnixFSEncodeResult(
-      rootCID: cid,
-      blocks: [block],
-    );
   }
 
   /// Encodes a chunked file with a root DAG-PB node.
@@ -80,6 +51,7 @@ class UnixFSEncoder {
 
     // Encode each chunk as a raw block
     await for (final chunk in chunker.chunk(file)) {
+      print('🐛 [UnixFS] Got chunk: ${chunk.length} bytes');
       final multihash = sha256Hash(chunk);
       final cid = CID.createV1(rawCode, multihash);
 
@@ -88,15 +60,22 @@ class UnixFSEncoder {
       leafSizes.add(chunk.length);
     }
 
-    // Special case: if we only got one chunk, return it as a raw block
-    if (blocks.length == 1) {
+    print('🐛 [UnixFS] Total chunks: ${leafCIDs.length}');
+    print('🐛 [UnixFS] Checking if leafCIDs.length == 1: ${leafCIDs.length == 1}');
+
+    // CRITICAL FIX: For single-block files, return RAW CID (not DAG-PB wrapper)
+    // This matches JS client behavior and enables instant IPFS gateway retrieval
+    if (leafCIDs.length == 1) {
+      print('🐛 [UnixFS] ✅ Returning single RAW block without DAG-PB wrapper');
       return UnixFSEncodeResult(
-        rootCID: blocks[0].cid,
+        rootCID: leafCIDs[0],
         blocks: blocks,
       );
     }
 
-    // Calculate actual file size if not provided
+    print('🐛 [UnixFS] Creating DAG-PB wrapper for ${leafCIDs.length} chunks');
+
+    // For multi-block files, create DAG-PB root node
     final actualFileSize =
         fileSize ?? leafSizes.fold<int>(0, (sum, size) => sum + size);
 

@@ -91,3 +91,47 @@ class CARBlock {
   }
 }
 
+/// Result of encoding a CAR file with block position tracking.
+///
+/// Used for creating ShardedDAGIndex, which needs to know where each block
+/// is located within the CAR file.
+@immutable
+class EncodedCAR {
+  /// Creates an EncodedCAR result.
+  const EncodedCAR({
+    required this.bytes,
+    required this.blockPositions,
+  });
+
+  /// The complete CAR file as bytes.
+  final Uint8List bytes;
+
+  /// Map of CID → (offset, length) for each block in the CAR.
+  ///
+  /// The offset is the byte position where the block starts (including the
+  /// length varint). The length is the total size of the block entry
+  /// (varint + CID bytes + data bytes).
+  final Map<CID, (int, int)> blockPositions;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EncodedCAR &&
+          runtimeType == other.runtimeType &&
+          _bytesEqual(bytes, other.bytes);
+
+  @override
+  int get hashCode => Object.hashAll(bytes);
+
+  @override
+  String toString() => 'EncodedCAR(size: ${bytes.length}, blocks: ${blockPositions.length})';
+
+  bool _bytesEqual(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
+

@@ -240,6 +240,17 @@ final class CID {
     }
   }
 
+  /// Convert to JSON (for DAG-CBOR encoding)
+  /// NOTE: This is called during JSON serialization
+  /// 🐛 DEBUG: Added logging to track when this is called
+  Map<String, String> toJson() {
+    print('🐛 [CID.toJson()] WARNING: toJson() called on CID!');
+    print('🐛   CID: ${toString()}');
+    print('🐛   Codec: $code (0x${code.toRadixString(16)})');
+    print('🐛   StackTrace: ${StackTrace.current}');
+    return {'/': toString()};
+  }
+
   /// Encode to string with optional base encoder
   ///
   /// CIDv0: always base58btc without prefix
@@ -282,9 +293,7 @@ final class CID {
     return true;
   }
 
-
-  /// Convert to JSON representation
-  Map<String, String> toJson() => {'/': toString()};
+  // toJson() method is defined earlier in the file with debug logging
 }
 
 /// Encode CIDv1 bytes: <version><codec><multihash>

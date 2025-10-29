@@ -211,14 +211,22 @@ class DagCborEncoder {
     // Tag 42 = 0xD8 0x2A
     // The CID bytes must be prefixed with 0x00 for historical reasons
     // (matches @ipld/dag-cbor implementation)
+
+    // 🐛 DEBUG: Trace CID encoding
+    print('🐛 [CBOR] Encoding CID:');
+    print('🐛   CID: $cid');
+    print('🐛   Codec: ${cid.code} (0x${cid.code.toRadixString(16)})');
+    print('🐛   Version: ${cid.version}');
+    print('🐛   Bytes length: ${cid.bytes.length}');
+
     _builder.addByte(0xD8);
     _builder.addByte(0x2A);
-    
+
     // Prefix CID bytes with 0x00
     final cidWithPrefix = Uint8List(cid.bytes.length + 1);
     cidWithPrefix[0] = 0x00;
     cidWithPrefix.setRange(1, cidWithPrefix.length, cid.bytes);
-    
+
     // Encode the prefixed CID bytes as byte string
     _encodeBytes(cidWithPrefix);
   }
