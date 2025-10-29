@@ -300,7 +300,7 @@ The name "QuantumAgentic" and associated trademarks may not be used to endorse p
 This is a community-driven Dart/Flutter implementation for Storacha Network. This package is not affiliated with or endorsed by Storacha Network or Protocol Labs.
 
 For the official JavaScript implementation:
-- [Official JavaScript Client](https://github.com/storacha/w3up)
+- [Official Upload Service](https://github.com/storacha/upload-service)
 
 ---
 
