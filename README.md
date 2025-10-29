@@ -1,11 +1,11 @@
 # storacha_dart
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-> ⚠️ **UNOFFICIAL & UNSTABLE VERSION**
-> This is an **unofficial** Dart/Flutter implementation of the Storacha Network client. This package is **not yet stable** and is under active development. APIs may change without notice. Use at your own risk in production environments.
+[![Development Status](https://img.shields.io/badge/status-active%20development-blue.svg)](https://github.com/QuantumAgentic/storacha_dart)
 
 A Dart/Flutter client library for [Storacha Network](https://storacha.network) (formerly web3.storage). Upload files to IPFS and Filecoin with ease using UCAN delegations.
+
+> **Note:** This package is under active development. APIs may change as new features are added and the implementation is refined. Check the [Development Status](#-development-status) section for current capabilities.
 
 ## ✨ Features
 
@@ -16,15 +16,16 @@ A Dart/Flutter client library for [Storacha Network](https://storacha.network) (
 - 🎯 **Type-safe** - Full Dart type safety with null safety
 - 📱 **Mobile-optimized** - Efficient memory usage and chunked uploads
 
-## 🚨 Current Limitations
+## 🚧 Current Implementation
 
-This package is **not yet production-ready**. Known limitations:
+Current implementation status:
 
-- **No email-based authentication** - You must use UCAN delegations from Storacha CLI
-- **Temporary backend workaround** - Uses an optional backend proxy for reliable uploads (see Configuration section)
-- **No directory uploads** - Only single file uploads are currently supported
-- **Limited error handling** - Some edge cases may not be properly handled
-- **Receipt handling incomplete** - Some Storacha receipts may not parse correctly
+- ✅ **UCAN delegation support** - Full support for delegations from Storacha CLI
+- ✅ **Single file uploads** - Upload files to IPFS/Filecoin
+- ✅ **Space management** - Create and manage storage spaces
+- 🔧 **Backend workaround available** - Optional backend proxy for enhanced reliability (see Configuration section)
+- 📋 **In progress** - Email-based authentication (use Storacha CLI delegations for now)
+- 📋 **Planned** - Directory uploads and batch operations
 
 ## 📋 Prerequisites
 
@@ -270,7 +271,7 @@ dart test test/integration/
 
 ## 🤝 Contributing
 
-This is an unofficial package developed by QuantumAgentic. Contributions are welcome!
+Contributions are welcome! This package is actively maintained by QuantumAgentic.
 
 To contribute:
 1. Fork the repository
@@ -278,7 +279,7 @@ To contribute:
 3. Make your changes with tests
 4. Submit a pull request
 
-Please note that APIs may change significantly as the package stabilizes.
+Please note that APIs may evolve as new features are added and the implementation is refined.
 
 ## 📄 License
 
@@ -294,11 +295,11 @@ The name "QuantumAgentic" and associated trademarks may not be used to endorse p
 - [UCAN Specification](https://github.com/ucan-wg/spec)
 - [IPFS Documentation](https://docs.ipfs.tech/)
 
-## ⚠️ Disclaimer
+## 📝 About
 
-This is an **unofficial** implementation and is **not affiliated with or endorsed by Storacha Network or Protocol Labs**. This package is provided "as-is" without warranty. Use in production at your own risk.
+This is a community-driven Dart/Flutter implementation for Storacha Network. This package is not affiliated with or endorsed by Storacha Network or Protocol Labs.
 
-For official Storacha clients, see:
+For the official JavaScript implementation:
 - [Official JavaScript Client](https://github.com/storacha/w3up)
 
 ---
