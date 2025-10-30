@@ -55,12 +55,6 @@ dependencies:
   
   # CBOR encoding for IPNS records
   cbor: ^6.2.0
-  
-  # WebView for mobile JS uploader
-  webview_flutter: ^4.4.0
-  
-  # QuickJS runtime (flutter_js) for WebView-less JS execution
-  flutter_js: ^0.8.1
 
 dev_dependencies:
   flutter_test:
@@ -84,9 +78,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: false
-  
-  # JS bundle for WebView uploader (mobile)
-  assets:
-    - assets/js/uploader.bundle.js
-    - assets/js/uploader.bundle.meta.json
+
+  # JS bundle for WebView uploader (mobile) - DISABLED, using backend instead
+  # assets:
+  #   - assets/js/uploader.bundle.js
+  #   - assets/js/uploader.bundle.meta.json
 
