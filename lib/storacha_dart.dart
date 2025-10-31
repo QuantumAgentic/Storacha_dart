@@ -52,3 +52,6 @@ export 'src/core/dag_cbor_encoder.dart' hide dagCborCode;
 export 'src/upload/blob.dart';
 export 'src/upload/progress_throttle.dart';
 export 'src/upload/upload_options.dart';
+
+// Export IPNS utilities
+export 'src/ipns/libp2p_key.dart';
