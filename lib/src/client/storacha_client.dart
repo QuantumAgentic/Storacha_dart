@@ -274,7 +274,7 @@ class StorachaClient {
     // Will be removed once the native Dart flow properly handles all Storacha receipts.
     if (_config.backendUrl != null) {
       print('🔹 Using backend upload: ${_config.backendUrl}');
-      return await _uploadViaBackend(carBytes, unixfsResult.rootCID);
+      return await _uploadViaBackend(carBytes, unixfsResult.rootCID, options: options);
     }
 
     // Step 3.5: Calculate piece CID for filecoin/offer
@@ -577,7 +577,11 @@ class StorachaClient {
   ///
   /// This is a temporary workaround and will be removed once the native
   /// Dart flow properly handles all Storacha receipts and integrations.
-  Future<CID> _uploadViaBackend(Uint8List carBytes, CID rootCID) async {
+  Future<CID> _uploadViaBackend(
+    Uint8List carBytes,
+    CID rootCID, {
+    UploadFileOptions? options,
+  }) async {
     try {
       // Get delegation for current space
       final delegation = _delegationStore.valid.firstWhere(
@@ -595,13 +599,30 @@ class StorachaClient {
 
       print('🔹 Sending ${carBytes.length} bytes to backend...');
 
+      // Build request data with optional Solana metadata
+      final requestData = <String, dynamic>{
+        'carBase64': carBase64,
+        'delegationBase64': delegationBase64,
+      };
+
+      // Add Solana metadata if provided
+      if (options?.creatorWallet != null) {
+        requestData['creatorWallet'] = options!.creatorWallet;
+        print('🔹 Including creatorWallet: ${options.creatorWallet}');
+      }
+      if (options?.ipnsName != null) {
+        requestData['ipnsName'] = options!.ipnsName;
+        print('🔹 Including ipnsName: ${options.ipnsName}');
+      }
+      if (options?.agentName != null) {
+        requestData['agentName'] = options!.agentName;
+        print('🔹 Including agentName: ${options.agentName}');
+      }
+
       // POST to backend
       final response = await _http.post<Map<String, dynamic>>(
         '${_config.backendUrl}/api/upload',
-        data: {
-          'carBase64': carBase64,
-          'delegationBase64': delegationBase64,
-        },
+        data: requestData,
       );
 
       if (response.data == null) {

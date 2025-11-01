@@ -130,6 +130,9 @@ class UploadFileOptions extends UploadOptions {
     super.rootCID,
     super.dedupe,
     this.chunkSize,
+    this.creatorWallet,
+    this.ipnsName,
+    this.agentName,
   });
 
   /// Size of UnixFS chunks in bytes.
@@ -137,6 +140,15 @@ class UploadFileOptions extends UploadOptions {
   /// Files are split into chunks of this size for efficient storage and
   /// retrieval. Default is typically 262144 bytes (256 KiB).
   final int? chunkSize;
+
+  /// Solana creator wallet address (for agent registry)
+  final String? creatorWallet;
+
+  /// IPNS name for agent manifest (for agent registry)
+  final String? ipnsName;
+
+  /// Agent name (for logging/metadata)
+  final String? agentName;
 
   @override
   UploadFileOptions copyWith({
@@ -146,6 +158,9 @@ class UploadFileOptions extends UploadOptions {
     CID? rootCID,
     bool? dedupe,
     int? chunkSize,
+    String? creatorWallet,
+    String? ipnsName,
+    String? agentName,
   }) =>
       UploadFileOptions(
         retries: retries ?? this.retries,
@@ -154,6 +169,9 @@ class UploadFileOptions extends UploadOptions {
         rootCID: rootCID ?? this.rootCID,
         dedupe: dedupe ?? this.dedupe,
         chunkSize: chunkSize ?? this.chunkSize,
+        creatorWallet: creatorWallet ?? this.creatorWallet,
+        ipnsName: ipnsName ?? this.ipnsName,
+        agentName: agentName ?? this.agentName,
       );
 }
 
