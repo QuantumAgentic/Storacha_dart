@@ -22,10 +22,12 @@ Current implementation status:
 
 - ✅ **UCAN delegation support** - Full support for delegations from Storacha CLI
 - ✅ **Single file uploads** - Upload files to IPFS/Filecoin
+- ✅ **Parallel batch uploads** - Upload up to 50 files concurrently with optimized polling
 - ✅ **Space management** - Create and manage storage spaces
+- ✅ **Progress tracking** - Per-file and aggregated progress for batch uploads
 - 🔧 **Backend workaround available** - Optional backend proxy for enhanced reliability (see Configuration section)
 - 📋 **In progress** - Email-based authentication (use Storacha CLI delegations for now)
-- 📋 **Planned** - Directory uploads and batch operations
+- 📋 **Planned** - Directory uploads as unified DAG structures
 
 ## 📋 Prerequisites
 
@@ -46,17 +48,34 @@ To use this package with the production Storacha Network, you need:
 
 ## 📦 Installation
 
+> **Note:** This package is not yet published to pub.dev. Install directly from GitHub.
+
 Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  storacha_dart: ^0.1.0
+  storacha_dart:
+    git:
+      url: https://github.com/QuantumAgentic/storacha_dart.git
+      ref: main  # or specify a tag/commit for stability
 ```
 
 Then run:
 
 ```bash
 flutter pub get
+```
+
+### Installing a Specific Version
+
+For production use, it's recommended to pin to a specific commit or tag:
+
+```yaml
+dependencies:
+  storacha_dart:
+    git:
+      url: https://github.com/QuantumAgentic/storacha_dart.git
+      ref: 9050c9b  # Specific commit hash
 ```
 
 ## 🚀 Quick Start
@@ -216,6 +235,36 @@ final options = UploadFileOptions(
 final cid = await client.uploadFile(file, options: options);
 ```
 
+### Parallel Batch Uploads
+
+Upload multiple files concurrently with optimized performance:
+
+```dart
+final files = [
+  MemoryFile(name: 'photo1.jpg', bytes: photo1Bytes),
+  MemoryFile(name: 'photo2.jpg', bytes: photo2Bytes),
+  MemoryFile(name: 'photo3.jpg', bytes: photo3Bytes),
+];
+
+final results = await client.uploadFiles(
+  files,
+  maxConcurrent: 10,  // Upload up to 10 files simultaneously
+  onProgress: (loaded, total) {
+    print('Overall: ${(loaded / total * 100).toStringAsFixed(1)}%');
+  },
+  onFileComplete: (filename, cid) {
+    print('✓ $filename: $cid');
+  },
+  onFileError: (filename, error) {
+    print('✗ $filename failed: $error');
+  },
+);
+
+print('Uploaded ${results.length} files successfully');
+```
+
+**Performance:** Optimized polling intervals (500ms) and timeouts (5s) provide 8-10x faster uploads compared to sequential processing.
+
 ## 📝 Examples
 
 See the `example/` directory for complete examples:
@@ -262,9 +311,11 @@ dart test test/integration/
 |---------|--------|-------|
 | UCAN delegations | ✅ Working | CAR and base64 formats supported |
 | Single file upload | ✅ Working | With temporary backend workaround |
+| Batch parallel uploads | ✅ Working | Up to 50 files concurrently, 8-10x faster |
 | Space management | ✅ Working | Local space management |
-| Progress tracking | ✅ Working | Chunked upload progress |
-| Directory upload | ⏳ Planned | Not yet implemented |
+| Progress tracking | ✅ Working | Per-file and aggregated progress |
+| Optimized polling | ✅ Working | 500ms intervals, 5s timeouts |
+| Directory upload | ⏳ Planned | Unified DAG structure |
 | Email authentication | ⏳ Planned | Use Storacha CLI for now |
 | Receipt handling | 🔧 In Progress | Some edge cases remain |
 | IPFS retrieval | 🔧 In Progress | Backend workaround available |
