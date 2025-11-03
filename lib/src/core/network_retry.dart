@@ -214,6 +214,19 @@ class ExponentialBackoffRetry {
 class RetryPresets {
   RetryPresets._(); // Prevent instantiation
 
+  /// Ultra-fast retry for parallel uploads with minimal latency.
+  ///
+  /// - Max retries: 2
+  /// - Base delay: 200ms
+  /// - Max delay: 2s
+  /// - Total time: ~2.5s max
+  /// - Use for parallel upload operations where speed is critical
+  static const ultraFast = RetryConfig(
+    maxRetries: 2,
+    baseDelay: Duration(milliseconds: 200),
+    maxDelay: Duration(seconds: 2),
+  );
+
   /// Fast retry for quickly recovering from transient errors.
   ///
   /// - Max retries: 3

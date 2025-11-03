@@ -98,9 +98,9 @@ Future<void> main() async {
   print('   ✓ Gateway URL: https://w3s.link/ipfs/$imageCid\n');
 
   // ========================================
-  // Step 5: Upload Multiple Files
+  // Step 5: Upload Multiple Files in Parallel
   // ========================================
-  print('5️⃣  Uploading batch of files...');
+  print('5️⃣  Uploading batch of files in parallel...');
 
   final files = [
     MemoryFile(
@@ -115,18 +115,33 @@ Future<void> main() async {
         utf8.encode('name,value\nAlice,100\nBob,200'),
       ),
     ),
+    MemoryFile(
+      name: 'notes.txt',
+      bytes: Uint8List.fromList(
+        utf8.encode('Meeting notes for project planning'),
+      ),
+    ),
   ];
 
-  print('   Uploading ${files.length} files...');
-  final uploadedFiles = <String, CID>{};
+  print('   Uploading ${files.length} files with optimized parallel processing...');
 
-  for (final file in files) {
-    final cid = await client.uploadFile(file);
-    uploadedFiles[file.name] = cid;
-    print('   ✓ ${file.name}: $cid');
-  }
+  // Use uploadFiles() for fast parallel uploads with progress tracking
+  final uploadedFiles = await client.uploadFiles(
+    files,
+    maxConcurrent: 10, // Upload up to 10 files simultaneously
+    onProgress: (loaded, total) {
+      final percentage = (loaded / total * 100).toStringAsFixed(1);
+      print('   📊 Overall progress: $percentage% (${_formatBytes(loaded)} / ${_formatBytes(total)})');
+    },
+    onFileComplete: (filename, cid) {
+      print('   ✓ $filename: $cid');
+    },
+    onFileError: (filename, error) {
+      print('   ✗ $filename failed: $error');
+    },
+  );
 
-  print('   ✓ Batch upload complete!\n');
+  print('   ✓ Batch upload complete! ${uploadedFiles.length}/${files.length} files uploaded successfully\n');
 
   // ========================================
   // Step 6: Demonstrate Content Addressing

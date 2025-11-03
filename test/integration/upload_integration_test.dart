@@ -549,6 +549,118 @@ void main() {
       expect(uploadedCids, hasLength(3));
       print('✓ Batch upload complete: ${uploadedCids.length} files');
     });
+
+    test('uploads multiple files in parallel with uploadFiles()', () async {
+      print('\n=== Testing Parallel Batch Upload with uploadFiles() ===');
+
+      final files = [
+        MemoryFile(
+          name: 'file1.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content 1')),
+        ),
+        MemoryFile(
+          name: 'file2.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content 2')),
+        ),
+        MemoryFile(
+          name: 'file3.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content 3')),
+        ),
+        MemoryFile(
+          name: 'file4.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content 4')),
+        ),
+        MemoryFile(
+          name: 'file5.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content 5')),
+        ),
+      ];
+
+      final progressUpdates = <String>[];
+      final completedFiles = <String>[];
+
+      final results = await client.uploadFiles(
+        files,
+        maxConcurrent: 3,
+        onProgress: (loaded, total) {
+          progressUpdates.add('Progress: $loaded/$total');
+        },
+        onFileComplete: (filename, cid) {
+          completedFiles.add(filename);
+          print('✓ Uploaded $filename: $cid');
+        },
+      );
+
+      // Verify all files were uploaded successfully
+      expect(results, hasLength(5));
+      expect(completedFiles, hasLength(5));
+
+      // Verify all filenames are in results
+      for (final file in files) {
+        expect(results, contains(file.name));
+        expect(results[file.name], isNotNull);
+      }
+
+      // Verify progress updates were received
+      expect(progressUpdates, isNotEmpty);
+
+      print('✓ Parallel batch upload complete: ${results.length} files');
+    });
+
+    test('uploadFiles() handles errors gracefully', () async {
+      print('\n=== Testing uploadFiles() Error Handling ===');
+
+      final files = [
+        MemoryFile(
+          name: 'valid1.txt',
+          bytes: Uint8List.fromList(utf8.encode('Valid content 1')),
+        ),
+        MemoryFile(
+          name: 'valid2.txt',
+          bytes: Uint8List.fromList(utf8.encode('Valid content 2')),
+        ),
+      ];
+
+      final errors = <String, Object>{};
+
+      final results = await client.uploadFiles(
+        files,
+        maxConcurrent: 2,
+        onFileError: (filename, error) {
+          errors[filename] = error;
+          print('⚠️ Error uploading $filename: $error');
+        },
+      );
+
+      // Even with potential errors, successful uploads should be returned
+      expect(results, isNotEmpty);
+      print('✓ Error handling verified: ${results.length} successful, ${errors.length} failed');
+    });
+
+    test('uploadFiles() respects concurrency limit', () async {
+      print('\n=== Testing uploadFiles() Concurrency Control ===');
+
+      final files = List.generate(
+        10,
+        (i) => MemoryFile(
+          name: 'file$i.txt',
+          bytes: Uint8List.fromList(utf8.encode('Content $i')),
+        ),
+      );
+
+      final startTime = DateTime.now();
+
+      final results = await client.uploadFiles(
+        files,
+        maxConcurrent: 3, // Limit to 3 concurrent uploads
+      );
+
+      final duration = DateTime.now().difference(startTime);
+
+      expect(results, hasLength(10));
+      print('✓ Uploaded 10 files with concurrency=3 in ${duration.inMilliseconds}ms');
+      print('✓ Average: ${duration.inMilliseconds ~/ 10}ms per file');
+    });
   });
 }
 

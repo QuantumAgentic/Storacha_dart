@@ -192,7 +192,7 @@ class StorachaTransport {
             }
             if (receiptBlock == null) {
               // Fallback to polling quickly
-              final receiptData = await pollReceipt(receiptCid, timeout: const Duration(seconds: 10));
+              final receiptData = await pollReceipt(receiptCid, timeout: const Duration(seconds: 3));
               if (receiptData != null) {
                 final ocm = receiptData['ocm'] as Map<String, dynamic>?;
                 final out = ocm?['out'] as Map<String, dynamic>?;
@@ -388,7 +388,7 @@ class StorachaTransport {
                   if (site == null || !site.containsKey('url')) {
                     for (final forkCidStr in cidToInvocation.keys) {
                       try {
-                        final r = await pollTaskReceipt(CID.parse(forkCidStr), timeout: const Duration(seconds: 5));
+                        final r = await pollTaskReceipt(CID.parse(forkCidStr), timeout: const Duration(seconds: 2));
                         if (r == null) continue;
                         Map<String, dynamic>? address;
                         if (r['ocm'] is Map) {
@@ -934,8 +934,8 @@ class StorachaTransport {
   /// Retrieves the receipt CAR and extracts the result.
   /// Returns null if receipt is not ready yet (should retry).
   Future<Map<String, dynamic>?> pollReceipt(CID receiptCid, {
-    Duration timeout = const Duration(seconds: 30),
-    Duration pollInterval = const Duration(seconds: 2),
+    Duration timeout = const Duration(seconds: 5),
+    Duration pollInterval = const Duration(milliseconds: 500),
   }) async {
     final deadline = DateTime.now().add(timeout);
     
@@ -1005,8 +1005,8 @@ class StorachaTransport {
   /// Polls the receipt endpoint using a TASK CID (invocation CID), similar to JS client.
   /// Returns the receipt map whose 'ocm.ran' matches the taskCid.
   Future<Map<String, dynamic>?> pollTaskReceipt(CID taskCid, {
-    Duration timeout = const Duration(seconds: 30),
-    Duration pollInterval = const Duration(seconds: 2),
+    Duration timeout = const Duration(seconds: 5),
+    Duration pollInterval = const Duration(milliseconds: 500),
   }) async {
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
